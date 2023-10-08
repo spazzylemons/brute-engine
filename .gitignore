@@ -2,3 +2,5 @@
 /build
 /*.pdx
 /Source/pdex.*
+/Source/maps
+/maps/*.wad.bak

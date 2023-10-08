@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+
+# This script converts maps into Brute's binary formats. Maps must be in PWADs and in UDMF format.
+# This requires the parsimonious package to run. (TODO use python environments to simplify this)
+
+# TODO convert sectors into sets of convex shapes or otherwise throw error on concave shapes
+
+import io
+import struct
+import sys
+import re
+
+UNQUOTE = re.compile(r'\\(.)')
+
+from parsimonious import Grammar, NodeVisitor
+
+udmf_grammar = Grammar(
+    r"""
+    translation_unit = ws global_expr*
+    global_expr      = block / expr
+    block            = identifier ws "{" ws expr* "}" ws
+    expr             = identifier ws "=" ws value ws ";" ws
+    identifier       = ~r"[A-Za-z_]+[A-Za-z0-9_]*"
+    value            = float / integer / quoted_string / keyword
+    integer          = ~r"[+-]?(0|[1-9][0-9]*)" / ~r"0x[0-9A-Fa-f]+"
+    float            = ~r"[+-]?[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?"
+    quoted_string    = ~r"\"([^\"\\]*(\\.[^\\]*)*)\""
+    keyword          = "true" / "false"
+    ws               = (space / line_comment / block_comment)*
+    space            = ~r"\s+"
+    line_comment     = ~r"//[^\r\n]*"
+    block_comment    = ~r"/\*.*?\*/"
+    """
+)
+
+class UdmfVisitor(NodeVisitor):
+    def visit_translation_unit(self, node, visited_children):
+        result = {}
+        for key, value in visited_children[1]:
+            if isinstance(value, dict):
+                if key not in result:
+                    result[key] = []
+                result[key].append(value)
+            else:
+                result[key] = value
+        return result
+
+    def visit_global_expr(self, node, visited_children):
+        return visited_children[0]
+
+    def visit_block(self, node, visited_children):
+        name = visited_children[0]
+        properties = {}
+        for key, value in visited_children[4]:
+            properties[key] = value
+        return name, properties
+
+    def visit_expr(self, node, visited_children):
+        return visited_children[0], visited_children[4]
+
+    def visit_identifier(self, node, visited_children):
+        return node.full_text[node.start:node.end]
+
+    def visit_value(self, node, visited_children):
+        return visited_children[0]
+
+    def visit_integer(self, node, visited_children):
+        return int(node.full_text[node.start:node.end])
+
+    def visit_float(self, node, visited_children):
+        return float(node.full_text[node.start:node.end])
+
+    def visit_quoted_string(self, node, visited_children):
+        return UNQUOTE.sub(r'\1', node.full_text[node.start+1:node.end-1])
+
+    def visit_keyword(self, node, visited_children):
+        return node.full_text[node.start:node.end] == 'true'
+
+    def generic_visit(self, node, visited_children):
+        return visited_children or node
+
+if len(sys.argv) != 3:
+    print('usage: {} <input PWAD> <output folder>'.format(sys.argv[0]), file=sys.stderr)
+    exit(1)
+
+# Parse WAD file.
+lumps = {}
+with open(sys.argv[1], 'rb') as wadfile:
+    if wadfile.read(4) != b'PWAD':
+        print('Not a PWAD', file=sys.stderr)
+        exit(1)
+    numlumps, infotableofs = struct.unpack('<ii', wadfile.read(8))
+    for i in range(numlumps):
+        wadfile.seek(infotableofs + 16 * i, io.SEEK_SET)
+        filepos, size = struct.unpack('<ii', wadfile.read(8))
+        name = wadfile.read(8)
+        if 0 in name:
+            name = name[:name.index(0)]
+        wadfile.seek(filepos, io.SEEK_SET)
+        lumps[name.decode()] = wadfile.read(size)
+# Get UDMF lump from WAD.
+udmf = lumps['TEXTMAP'].decode()
+# Parse UDMF.
+mapdata = UdmfVisitor().visit(udmf_grammar.parse(udmf))
+# Write vertices.
+out_vertices = bytearray()
+for vertex in mapdata['vertex']:
+    x = round(vertex['x'])
+    y = round(vertex['y'])
+    out_vertices.extend(struct.pack('<hh', x, y))
+# Get which walls belong to which sector.
+walls = [[] for _ in range(len(mapdata['sector']))]
+for linedef in mapdata['linedef']:
+    if 'twosided' in linedef:
+        front_sector = mapdata['sidedef'][linedef['sidefront']]['sector']
+        back_sector = mapdata['sidedef'][linedef['sideback']]['sector']
+        walls[front_sector].append((linedef['v1'], linedef['v2'], back_sector))
+        walls[back_sector].append((linedef['v2'], linedef['v1'], front_sector))
+    else:
+        front_sector = mapdata['sidedef'][linedef['sidefront']]['sector']
+        walls[front_sector].append((linedef['v1'], linedef['v2'], front_sector))
+# Write walls and sectors.
+out_walls = bytearray()
+out_sectors = bytearray()
+wall_index = 0
+for wall_set in walls:
+    out_sectors.extend(struct.pack('<HH', len(wall_set), wall_index))
+    for i, wall in enumerate(wall_set):
+        assert wall[1] == wall_set[(i+1)%len(wall_set)][0]
+        out_walls.extend(struct.pack('<HH', wall[0], wall[2]))
+        wall_index += 1
+# Commit to files.
+with open(sys.argv[2] + '/vertices', 'wb') as file:
+    file.write(out_vertices)
+with open(sys.argv[2] + '/sectors', 'wb') as file:
+    file.write(out_sectors)
+with open(sys.argv[2] + '/walls', 'wb') as file:
+    file.write(out_walls)
+

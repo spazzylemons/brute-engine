@@ -13,15 +13,20 @@ ifeq ($(SDK),)
 $(error SDK path not found; set ENV value PLAYDATE_SDK_PATH)
 endif
 
+# WADs from which map files are derived
+WADFILES = $(wildcard maps/*.wad)
+MAPDIRS = $(patsubst maps/%.wad,Source/maps/%,$(WADFILES))
+MAPFILES = $(MAPDIRS:=/vertices) $(MAPDIRS:=/sectors) $(MAPDIRS:=/walls)
+
 ######
 # IMPORTANT: You must add your source folders to VPATH for make to find them
 # ex: VPATH += src1:src2
 ######
 
-VPATH += src
+VPATH += src src/map
 
 # List C source files here
-SRC = src/main.c
+SRC = src/core.c src/main.c src/map/load.c
 
 # List all user directories here
 UINCDIR = 
@@ -42,3 +47,14 @@ ULIBDIR =
 ULIBS =
 
 include $(SDK)/C_API/buildsupport/common.mk
+
+all: $(MAPFILES)
+
+Source/maps/%/vertices Source/maps/%/sectors Source/maps/%/walls: maps/%.wad
+	mkdir -p Source/maps/$*
+	tools/map_converter.py $< Source/maps/$*
+
+clean: mapclean
+
+mapclean:
+	-rm -rf Source/maps
