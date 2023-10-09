@@ -31,11 +31,11 @@ static int update(void *userdata) {
     }
     vertex_t delta;
     if (held & kButtonUp) {
-        delta.x = -M_Sine(DEG_0 - ang) << 1;
-        delta.y = M_Cosine(DEG_0 - ang) << 1;
+        delta.x = -M_Sine(DEG_0 - ang) * 2.0f;
+        delta.y = M_Cosine(DEG_0 - ang) * 2.0f;
     } else if (held & kButtonDown) {
-        delta.x = M_Sine(DEG_0 - ang) << 1;
-        delta.y = -M_Cosine(DEG_0 - ang) << 1;
+        delta.x = M_Sine(DEG_0 - ang) * 2.0f;
+        delta.y = -M_Cosine(DEG_0 - ang) * 2.0f;
     } else {
         delta.x = 0;
         delta.y = 0;

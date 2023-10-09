@@ -7,8 +7,8 @@
 
 #include "b_types.h"
 
-// Lookup table for sine and cosine. Despite its size, it is never more than one angle unit off from
-// the true value, thanks to interpolation.
-extern fixed_t M_SineTable[257];
+// Lookup table for sine and cosine. Table is small but reasonably accurate with
+// interpolation.
+extern float M_SineTable[257];
 
 #endif

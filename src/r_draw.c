@@ -1,16 +1,15 @@
 #include "core.h"
-#include "m_fixed.h"
 #include "m_trig.h"
 #include "r_draw.h"
 
 #include <stdbool.h>
 
-static void RotatePoint(fixed_t *x, fixed_t *y, angle_t ang) {
+static void RotatePoint(float *x, float *y, angle_t ang) {
     // TODO inefficient - sin and cos are recalculated way too often
-    fixed_t s = M_Sine(ang);
-    fixed_t c = M_Cosine(ang);
-    fixed_t new_x  = M_FixedMul(*x, c) - M_FixedMul(*y, s);
-    *y = M_FixedMul(*x, s) + M_FixedMul(*y, c);
+    float s = M_Sine(ang);
+    float c = M_Cosine(ang);
+    float new_x  = *x * c - *y * s;
+    *y = *x * s + *y * c;
     *x = new_x;
 }
 
@@ -19,9 +18,9 @@ static void RotatePoint(fixed_t *x, fixed_t *y, angle_t ang) {
 static uint8_t FilledColumns[LCD_COLUMNS >> 3];
 
 // Half of the screen X resolution.
-#define SCREEN_DISTANCE 200
+#define SCREEN_DISTANCE 200.0f
 
-#define NEAR_PLANE (1 << FRACBITS)
+#define NEAR_PLANE 1.0f
 
 #define DitherPattern(a, b, c, d) { a * 0x11, b * 0x11, c * 0x11, d * 0x11 }
 
@@ -47,11 +46,11 @@ static const uint8_t shades[17][4] = {
 
 static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *pos, angle_t ang) {
     // Find the corners of this wall.
-    fixed_t ax = wall->v1->x - pos->x;
-    fixed_t ay = wall->v1->y - pos->y;
+    float ax = wall->v1->x - pos->x;
+    float ay = wall->v1->y - pos->y;
     RotatePoint(&ax, &ay, ang);
-    fixed_t bx = wall->v2->x - pos->x;
-    fixed_t by = wall->v2->y - pos->y;
+    float bx = wall->v2->x - pos->x;
+    float by = wall->v2->y - pos->y;
     RotatePoint(&bx, &by, ang);
     // Frustrum culling.
     if (ax > ay && bx > by) {
@@ -60,7 +59,7 @@ static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *p
     // Sort by distance to camera for "Z" (techinically Y) clipping.
     bool flipped = false;
     if (ay > by) {
-        fixed_t temp;
+        float temp;
         temp = ax;
         ax = bx;
         bx = temp;
@@ -76,48 +75,47 @@ static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *p
             return false;
         }
         // Partially behind near plane. Clip it.
-        fixed_t t = M_FixedDiv(NEAR_PLANE - ay, by - ay);
-        ax += M_FixedMul(t, bx - ax);
+        float t = (NEAR_PLANE - ay) / (by - ay);
+        ax += t * (bx - ax);
         ay = NEAR_PLANE;
     }
 
     // Project onto screen using 90-degree FOV.
-    // From this point forward, we're dealing in integer values and not fixed-point values.
-    // We just reuse the fixed-point variables since they're the same underlying type.
-    ax = ((SCREEN_DISTANCE * (ax >> FRACBITS)) / (ay >> FRACBITS));
-    bx = ((SCREEN_DISTANCE * (bx >> FRACBITS)) / (by >> FRACBITS));
-    ay = ((SCREEN_DISTANCE * (32)) / (ay >> FRACBITS));
-    by = ((SCREEN_DISTANCE * (32)) / (by >> FRACBITS));
+    // From this point forward, we're dealing in integer values.
+    int axi = ((SCREEN_DISTANCE * ax) / ay);
+    int bxi = ((SCREEN_DISTANCE * bx) / by);
+    int ayi = ((SCREEN_DISTANCE * 32.0f) / ay);
+    int byi = ((SCREEN_DISTANCE * 32.0f) / by);
     // Backface culling.
-    if ((ax < bx) == flipped) {
+    if ((axi < bxi) == flipped) {
         return false;
     }
-    // Sort by X position for easier clipping.
-    if (ax > bx) {
+    // Sort byi X position for easier clipping.
+    if (axi > bxi) {
         int32_t temp;
-        temp = ax;
-        ax = bx;
-        bx = temp;
-        temp = ay;
-        ay = by;
-        by = temp;
+        temp = axi;
+        axi = bxi;
+        bxi = temp;
+        temp = ayi;
+        ayi = byi;
+        byi = temp;
     }
     // Check if should clip to the left.
-    if (ax < -200) {
-        if (bx < -200) {
+    if (axi < -200) {
+        if (bxi < -200) {
             // Fully off screen to the left.
             return false;
         }
-        ay += ((-200 - ax) * (by - ay)) / (bx - ax);
-        ax = -200;
+        ayi += ((-200 - axi) * (byi - ayi)) / (bxi - axi);
+        axi = -200;
     }
-    if (bx > 199) {
-        if (ax > 199) {
+    if (bxi > 199) {
+        if (axi > 199) {
             // Fully off screen to the right.
             return false;
         }
-        by += ((199 - bx) * (ay - by)) / (ax - bx);
-        bx = 199;
+        byi += ((199 - bxi) * (ayi - byi)) / (axi - bxi);
+        bxi = 199;
     }
     // If wall is a portal, this is our cue to exit.
     if (wall->portal != NULL) {
@@ -125,8 +123,8 @@ static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *p
     }
 
     // Get points of polygon to draw.
-    int x1 = ax + 200;
-    int x2 = bx + 200;
+    int x1 = axi + 200;
+    int x2 = bxi + 200;
     // Draw rectangle.
     uint8_t *buf = &framebuffer[x1 >> 3];
     uint8_t mask1 = 1 << (7 - (x1 & 7));
@@ -135,8 +133,8 @@ static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *p
         int mask = 1 << (x & 7);
         if ((FilledColumns[index] & mask) == 0) {
             FilledColumns[index] |= mask;
-            // This division is designed specifically to avoid dividing by zero.
-            int y = ay + (((x - x1) * (by - ay)) / (x2 - x1 + 1));
+            // This division is designed specifically to avoid dividing byi zero.
+            int y = ayi + (((x - x1) * (byi - ayi)) / (x2 - x1 + 1));
             // Figure out temporary shade of column.
             int shade = y >> 3;
             if (shade < 0) {

@@ -117,9 +117,8 @@ map_t *M_Load(const char *name) {
     }
     // Convert vertices.
     for (size_t i = 0; i < num_vtxs; i++) {
-        // Fixed point conversion.
-        vtxs[i].x = f_vtxs[i].x << FRACBITS;
-        vtxs[i].y = f_vtxs[i].y << FRACBITS;
+        vtxs[i].x = f_vtxs[i].x;
+        vtxs[i].y = f_vtxs[i].y;
     }
     // Convert sectors.
     for (size_t i = 0; i < num_scts; i++) {
