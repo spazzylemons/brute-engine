@@ -5,6 +5,9 @@
 
 #include "map/load.h"
 
+#include "m_trig.h"
+#include "r_draw.h"
+
 PlaydateAPI *playdate;
 
 static int sector_stack_position = 0;
@@ -12,32 +15,42 @@ static int sector_stack_top = 1;
 static map_t *map = NULL;
 static sector_t *sector_stack[30];
 
+static angle_t ang = DEG_0;
+static vertex_t pos = { 0, 0 };
+
 static int update(void *userdata) {
     (void) userdata;
 
-    if (map != NULL) {
-        if (sector_stack_position != sector_stack_top) {
-            sector_t *sector = sector_stack[sector_stack_position++];
-            for (int i = 0; i < sector->num_walls; i++) {
-                wall_t *wall = &sector->walls[i];
-                if (wall->portal != NULL) {
-                    for (int j = 0; j < sector_stack_top; j++) {
-                        if (sector_stack[j] == wall->portal) {
-                            goto no_add;
-                        }
-                    }
-                    sector_stack[sector_stack_top++] = wall->portal;
-                no_add:
-                    ;
-                }
-                int x1 = ((wall->v1->x >> FRACBITS) >> 2) + 200;
-                int y1 = ((wall->v1->y >> FRACBITS) >> 2) + 120;
-                int x2 = ((wall->v2->x >> FRACBITS) >> 2) + 200;
-                int y2 = ((wall->v2->y >> FRACBITS) >> 2) + 120;
-                playdate->graphics->drawLine(x1, y1, x2, y2, 1, kColorBlack);
-            }
-        }
+    PDButtons held;
+    playdate->system->getButtonState(&held, NULL, NULL);
+    if (held & kButtonLeft) {
+        ang -= 200;
     }
+    if (held & kButtonRight) {
+        ang += 200;
+    }
+    vertex_t delta;
+    if (held & kButtonUp) {
+        delta.x = -M_Sine(DEG_0 - ang) << 1;
+        delta.y = M_Cosine(DEG_0 - ang) << 1;
+    } else if (held & kButtonDown) {
+        delta.x = M_Sine(DEG_0 - ang) << 1;
+        delta.y = -M_Cosine(DEG_0 - ang) << 1;
+    } else {
+        delta.x = 0;
+        delta.y = 0;
+    }
+
+    pos.x += delta.x;
+    pos.y += delta.y;
+
+    playdate->graphics->clear(kColorBlack);
+    if (map != NULL) {
+        R_DrawSector(playdate->graphics->getFrame(), &map->scts[0], &pos, ang);
+    }
+    playdate->graphics->markUpdatedRows(0, LCD_ROWS - 1);
+
+    playdate->system->drawFPS(0, 0);
 
     return 1;
 }

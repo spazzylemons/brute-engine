@@ -26,7 +26,7 @@ MAPFILES = $(MAPDIRS:=/vertices) $(MAPDIRS:=/sectors) $(MAPDIRS:=/walls)
 VPATH += src src/map
 
 # List C source files here
-SRC = src/core.c src/main.c src/map/load.c
+SRC = src/core.c src/main.c src/map/load.c src/m_fixed.c src/m_tables.c src/m_trig.c src/r_draw.c
 
 # List all user directories here
 UINCDIR = 

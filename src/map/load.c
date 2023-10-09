@@ -125,6 +125,9 @@ map_t *M_Load(const char *name) {
     for (size_t i = 0; i < num_scts; i++) {
         file_sector_t *f_sector = &f_scts[i];
         sector_t *sector = &scts[i];
+        // Initialize draw lists.
+        sector->next_drawn = NULL;
+        sector->next_queued = NULL;
         // Must have at least three sides.
         if (f_sector->num_walls < 3) {
             goto fail;

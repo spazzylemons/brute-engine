@@ -119,6 +119,12 @@ for linedef in mapdata['linedef']:
     else:
         front_sector = mapdata['sidedef'][linedef['sidefront']]['sector']
         walls[front_sector].append((linedef['v1'], linedef['v2'], front_sector))
+# Fix each wall set so its lines are in order.
+for i, wall_set in enumerate(walls):
+    new_wall_set = [wall_set[0]]
+    while len(new_wall_set) < len(wall_set):
+        new_wall_set.append([wall for wall in wall_set if wall[0] == new_wall_set[-1][1]][0])
+    walls[i] = new_wall_set
 # Write walls and sectors.
 out_walls = bytearray()
 out_sectors = bytearray()
