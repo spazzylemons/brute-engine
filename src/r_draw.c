@@ -7,8 +7,8 @@
 
 static void RotatePoint(float *x, float *y, float ang) {
     // TODO inefficient - sin and cos are recalculated way too often
-    float s = sinf(ang);
-    float c = cosf(ang);
+    float s = sinf(-ang);
+    float c = cosf(-ang);
     float new_x  = *x * c - *y * s;
     *y = *x * s + *y * c;
     *x = new_x;

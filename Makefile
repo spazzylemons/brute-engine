@@ -27,6 +27,8 @@ VPATH += src
 
 # List C source files here
 SRC = \
+	src/a_actor.c \
+	src/a_player.c \
 	src/b_core.c \
 	src/b_main.c \
 	src/m_iter.c \
@@ -34,6 +36,7 @@ SRC = \
 	src/m_map.c \
 	src/r_draw.c \
 	src/u_aabb.c \
+	src/u_math.c \
 	src/u_vec.c
 
 # List all user directories here

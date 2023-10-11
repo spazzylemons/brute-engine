@@ -166,7 +166,7 @@ static const wall_t *SectorCollide(
     return closest;
 }
 
-sector_t *G_MoveAndSlide(sector_t *sector, vector_t *pos, vector_t *delta) {
+sector_t *M_MoveAndSlide(sector_t *sector, vector_t *pos, vector_t *delta) {
     // failsafe - only allow so many sector changes
     // this hasn't been triggered to my knowledge and may not be useful
     uint8_t changes_left = 5;

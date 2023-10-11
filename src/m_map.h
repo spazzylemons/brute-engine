@@ -3,6 +3,6 @@
 
 #include "m_defs.h"
 
-sector_t *G_MoveAndSlide(sector_t *sector, vector_t *pos, vector_t *delta);
+sector_t *M_MoveAndSlide(sector_t *sector, vector_t *pos, vector_t *delta);
 
 #endif
