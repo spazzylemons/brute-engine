@@ -1,3 +1,4 @@
+#include "../b_math.h"
 #include "../core.h"
 #include "load.h"
 
@@ -124,9 +125,9 @@ map_t *M_Load(const char *name) {
     for (size_t i = 0; i < num_scts; i++) {
         file_sector_t *f_sector = &f_scts[i];
         sector_t *sector = &scts[i];
-        // Initialize draw lists.
-        sector->next_drawn = NULL;
-        sector->next_queued = NULL;
+        // Initialize iterator lists.
+        sector->next_seen = NULL;
+        sector->next_queue = NULL;
         // Must have at least three sides.
         if (f_sector->num_walls < 3) {
             goto fail;
@@ -141,6 +142,11 @@ map_t *M_Load(const char *name) {
         sector->num_walls = f_sector->num_walls;
         sector->walls = &walls[f_sector->first_wall];
         // Convert walls in this sector.
+        vertex_t min_point, max_point;
+        min_point.x = INFINITY;
+        min_point.y = INFINITY;
+        max_point.x = -INFINITY;
+        max_point.y = -INFINITY;
         for (size_t j = 0; j < sector->num_walls; j++) {
             file_wall_t *f_wall = &f_walls[f_sector->first_wall + j];
             file_wall_t *f_next = &f_walls[f_sector->first_wall + (j + 1) % sector->num_walls];
@@ -151,6 +157,32 @@ map_t *M_Load(const char *name) {
             }
             wall->v1 = &vtxs[f_wall->vertex];
             wall->v2 = &vtxs[f_next->vertex];
+            // Wall must have a nonzero length.
+            if (wall->v1->x == wall->v2->x && wall->v1->y == wall->v2->y) {
+                goto fail;
+            }
+            // Precalculate delta.
+            B_VtxCopy(&wall->delta, wall->v2);
+            B_VtxSub(&wall->delta, wall->v1);
+            // Precalculate normal.
+            wall->normal.x = wall->v2->y - wall->v1->y;
+            wall->normal.y = wall->v1->x - wall->v2->x;
+            float nlength = sqrtf(wall->normal.x * wall->normal.x + wall->normal.y * wall->normal.y);
+            wall->normal.x /= nlength;
+            wall->normal.y /= nlength;
+            // Check for bounding box.
+            if (wall->v1->x < min_point.x) {
+                min_point.x = wall->v1->x;
+            }
+            if (wall->v1->x > max_point.x) {
+                max_point.x = wall->v1->x;
+            }
+            if (wall->v1->y < min_point.y) {
+                min_point.y = wall->v1->y;
+            }
+            if (wall->v1->y > max_point.y) {
+                max_point.y = wall->v1->y;
+            }
             // Wall portal index must be within bounds.
             if (f_wall->portal != i) {
                 if (f_wall->portal >= num_scts) {
@@ -161,6 +193,9 @@ map_t *M_Load(const char *name) {
                 wall->portal = NULL;
             }
         }
+        // Get bounding box of this sector.
+        B_VtxCopy(&sector->bounds.min, &min_point);
+        B_VtxCopy(&sector->bounds.max, &max_point);
     }
     // Free file data.
     Deallocate(f_vtxs);
@@ -189,4 +224,62 @@ void M_Free(map_t *map) {
     Deallocate(map->scts);
     Deallocate(map->walls);
     Deallocate(map);
+}
+
+void M_SectorIterNew(sectoriter_t *iter, sector_t *first) {
+    iter->root = first;
+    iter->seen = first;
+    iter->head = first;
+    iter->tail = first;
+}
+
+void M_SectorIterPush(sectoriter_t *iter, sector_t *sector) {
+    if (sector != iter->root && sector->next_seen == NULL) {
+        sector->next_seen = iter->seen;
+        iter->seen = sector;
+
+        if (iter->tail == NULL) {
+            iter->head = sector;
+            iter->tail = sector;
+        } else {
+            iter->tail->next_queue = sector;
+            iter->tail = sector;
+        }
+    }
+}
+
+sector_t *M_SectorIterPop(sectoriter_t *iter) {
+    sector_t *result = iter->head;
+    if (result != NULL) {
+        iter->head = result->next_queue;
+        if (iter->head == NULL) {
+            iter->tail = NULL;
+        }
+    }
+    return result;
+}
+
+void M_SectorIterCleanup(sectoriter_t *iter) {
+    while (iter->seen != NULL) {
+        sector_t *sector = iter->seen;
+        iter->seen = sector->next_seen;
+        sector->next_seen = NULL;
+        sector->next_queue = NULL;
+    }
+}
+
+static bool PointInFrontOfWall(const wall_t *wall, const vertex_t *point) {
+    return (wall->v2->y - wall->v1->y) * (point->x - wall->v1->x) >
+        (wall->v2->x - wall->v1->x) * (point->y - wall->v1->y);
+}
+
+bool M_SectorContainsPoint(const sector_t *sector, const vertex_t *point) {
+    for (size_t i = 0; i < sector->num_walls; i++) {
+        const wall_t *wall = &sector->walls[i];
+        // Test if point lies in front of line.
+        if (!PointInFrontOfWall(wall, point)) {
+            return false;
+        }
+    }
+    return true;
 }

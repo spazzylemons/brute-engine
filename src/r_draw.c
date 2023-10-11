@@ -1,13 +1,13 @@
+#include "b_math.h"
 #include "core.h"
-#include "m_trig.h"
 #include "r_draw.h"
 
 #include <stdbool.h>
 
-static void RotatePoint(float *x, float *y, angle_t ang) {
+static void RotatePoint(float *x, float *y, float ang) {
     // TODO inefficient - sin and cos are recalculated way too often
-    float s = M_Sine(ang);
-    float c = M_Cosine(ang);
+    float s = sinf(ang);
+    float c = cosf(ang);
     float new_x  = *x * c - *y * s;
     *y = *x * s + *y * c;
     *x = new_x;
@@ -44,7 +44,7 @@ static const uint8_t shades[17][4] = {
     DitherPattern(0xf, 0xf, 0xf, 0xf),
 };
 
-static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *pos, angle_t ang) {
+static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *pos, float ang) {
     // Find the corners of this wall.
     float ax = wall->v1->x - pos->x;
     float ay = wall->v1->y - pos->y;
@@ -53,8 +53,23 @@ static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *p
     float by = wall->v2->y - pos->y;
     RotatePoint(&bx, &by, ang);
     // Frustrum culling.
-    if (ax > ay && bx > by) {
+    if ((ax > ay && bx > by) || (-ax > ay && -bx > by)) {
         return false;
+    }
+    // Backface culling.
+    if ((ax * by) > (bx * ay)) {
+        return false;
+    }
+    // If this is a portal, this is where we'll do different checks. Wall checks
+    // on a portal can produce unwanted results since the player can stand inside
+    // portals.
+    if (wall->portal != NULL) {
+        // Check if completely behind the screen.
+        if (ay < 0.0f && by < 0.0f) {
+            return false;
+        }
+        // As far as we care, we're visible. More checks may be added later.
+        return true;
     }
     // Sort by distance to camera for "Z" (techinically Y) clipping.
     bool flipped = false;
@@ -86,10 +101,6 @@ static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *p
     int bxi = ((SCREEN_DISTANCE * bx) / by);
     int ayi = ((SCREEN_DISTANCE * 32.0f) / ay);
     int byi = ((SCREEN_DISTANCE * 32.0f) / by);
-    // Backface culling.
-    if ((axi < bxi) == flipped) {
-        return false;
-    }
     // Sort byi X position for easier clipping.
     if (axi > bxi) {
         int32_t temp;
@@ -116,10 +127,6 @@ static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *p
         }
         byi += ((199 - bxi) * (ayi - byi)) / (axi - bxi);
         bxi = 199;
-    }
-    // If wall is a portal, this is our cue to exit.
-    if (wall->portal != NULL) {
-        return true;
     }
 
     // Get points of polygon to draw.
@@ -161,51 +168,71 @@ static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *p
             ++buf;
             mask1 = 0x80;
         }
-        // playdate->graphics->drawLine(x, 120 - y, x, 120 + y, 1, (LCDColor) &shades[shade]);
     }
     return false;
 }
 
-void R_DrawSector(uint8_t *framebuffer, sector_t *sector, const vertex_t *pos, angle_t ang) {
+bool DrawWallAutoMap(const wall_t *wall, const vertex_t *pos, float ang) {
+    // Find the corners of this wall.
+    float ax = wall->v1->x - pos->x;
+    float ay = wall->v1->y - pos->y;
+    RotatePoint(&ax, &ay, ang);
+    float bx = wall->v2->x - pos->x;
+    float by = wall->v2->y - pos->y;
+    RotatePoint(&bx, &by, ang);
+    // Naive line drawing for now.
+    if (wall->portal != NULL) {
+        return true;
+    } else {
+        playdate->graphics->drawLine(ax + 200.0f, 120.0f - ay, bx + 200.0f, 120.0f - by, 1, kColorWhite);
+        return false;
+    }
+}
+
+void R_DrawSector(uint8_t *framebuffer, sector_t *sector, const vertex_t *pos, float ang) {
     // Clear all columns.
     memset(FilledColumns, 0, sizeof(FilledColumns));
-    // Remember the first sector.
-    sector_t *root = sector;
-    // Keep a list of all drawn sectors.
-    sector_t *drawn = sector;
-    // Add it to the queue.
-    sector_t *queue = sector;
+    // Iterate.
+    sectoriter_t iter;
+    M_SectorIterNew(&iter, sector);
     // While the queue is not empty...
-    while (queue != NULL) {
-        // Pick off a sector from the queue.
-        sector = queue;
-        queue = queue->next_queued;
+    while ((sector = M_SectorIterPop(&iter)) != NULL) {
         // Check each wall in the queue.
         for (size_t i = 0; i < sector->num_walls; i++) {
             const wall_t *wall = &sector->walls[i];
             bool draw_portal = DrawWall(framebuffer, wall, pos, ang);
             if (draw_portal) {
-                // If the wall is a portal...
+                // If the wall is a portal, push it.
                 sector_t *portal = wall->portal;
-                // First, we check if the portal sector has been drawn already.
-                // It's drawn if it is either the root or has a non-NULL next_drawn pointer.
-                if (portal != root && portal->next_drawn == NULL) {
-                    // Mark the sector as "drawn" as to not add it to the queue any more.
-                    portal->next_drawn = drawn;
-                    drawn = portal;
-                    // Now add it to the queue. It acts more like a stack but is functionally a
-                    // queue for our purposes.
-                    portal->next_queued = queue;
-                    queue = portal;
-                }
+                M_SectorIterPush(&iter, portal);
             }
         }
     }
     // Clean up linked lists.
-    while (drawn != NULL) {
-        sector = drawn;
-        drawn = drawn->next_drawn;
-        sector->next_drawn = NULL;
-        sector->next_queued = NULL;
+    M_SectorIterCleanup(&iter);
+    // Notify the system that we've drawn over the framebuffer.
+    playdate->graphics->markUpdatedRows(0, LCD_ROWS - 1);
+}
+
+void R_DrawAutoMap(sector_t *sector, const vertex_t *pos, float ang) {
+    // Iterate.
+    sectoriter_t iter;
+    M_SectorIterNew(&iter, sector);
+    // While the queue is not empty...
+    while ((sector = M_SectorIterPop(&iter)) != NULL) {
+        // Check each wall in the queue.
+        for (size_t i = 0; i < sector->num_walls; i++) {
+            const wall_t *wall = &sector->walls[i];
+            bool draw_portal = DrawWallAutoMap(wall, pos, ang);
+            if (draw_portal) {
+                // If the wall is a portal, push it.
+                sector_t *portal = wall->portal;
+                M_SectorIterPush(&iter, portal);
+            }
+        }
     }
+    // Clean up linked lists.
+    M_SectorIterCleanup(&iter);
+    // Draw a circle in the center to debug collision.
+    playdate->graphics->drawEllipse(180, 100, 40, 40, 1, 0.0f, 0.0f, kColorWhite);
 }
