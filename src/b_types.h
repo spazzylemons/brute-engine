@@ -8,10 +8,4 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// A two-dimensional point.
-typedef struct {
-    float x;
-    float y;
-} vertex_t;
-
 #endif

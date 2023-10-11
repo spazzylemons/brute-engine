@@ -136,18 +136,18 @@ for wall_set in walls:
         out_walls.extend(struct.pack('<HH', wall[0], wall[2]))
         wall_index += 1
 # If uncommented, outputs a list of Desmos equations to plot the map.
-for wall_set in walls:
-    # \operatorname{polygon}\left(\left(1,2\right),\left(3,4\right)\right)
-    print(r'\operatorname{polygon}\left(', end='')
-    for i, wall in enumerate(wall_set):
-        if i != 0:
-            print(',', end='')
-        print(r'\left(', end='')
-        print(mapdata['vertex'][wall[0]]['x'], end='')
-        print(',', end='')
-        print(mapdata['vertex'][wall[0]]['y'], end='')
-        print(r'\right)', end='')
-    print(r'\right)')
+# for wall_set in walls:
+#     # \operatorname{polygon}\left(\left(1,2\right),\left(3,4\right)\right)
+#     print(r'\operatorname{polygon}\left(', end='')
+#     for i, wall in enumerate(wall_set):
+#         if i != 0:
+#             print(',', end='')
+#         print(r'\left(', end='')
+#         print(mapdata['vertex'][wall[0]]['x'], end='')
+#         print(',', end='')
+#         print(mapdata['vertex'][wall[0]]['y'], end='')
+#         print(r'\right)', end='')
+#     print(r'\right)')
 # Commit to files.
 with open(sys.argv[2] + '/vertices', 'wb') as file:
     file.write(out_vertices)

@@ -1,6 +1,6 @@
-#include "../b_math.h"
-#include "../core.h"
-#include "load.h"
+#include "b_core.h"
+#include "m_load.h"
+#include "u_vec.h"
 
 // Just in case, we'll pack the structs we read from the files.
 #define PACKED __attribute__((__packed__))
@@ -91,7 +91,7 @@ map_t *M_Load(const char *name) {
     file_sector_t *f_scts;
     file_wall_t *f_walls;
     // Map data.
-    vertex_t *vtxs = NULL;
+    vector_t *vtxs = NULL;
     sector_t *scts = NULL;
     wall_t *walls = NULL;
     map_t *map = NULL;
@@ -108,7 +108,7 @@ map_t *M_Load(const char *name) {
         goto fail;
     }
     // Allocate data structures.
-    vtxs = Allocate(sizeof(vertex_t) * num_vtxs);
+    vtxs = Allocate(sizeof(vector_t) * num_vtxs);
     scts = Allocate(sizeof(sector_t) * num_scts);
     walls = Allocate(sizeof(wall_t) * num_walls);
     map = Allocate(sizeof(map_t));
@@ -142,7 +142,7 @@ map_t *M_Load(const char *name) {
         sector->num_walls = f_sector->num_walls;
         sector->walls = &walls[f_sector->first_wall];
         // Convert walls in this sector.
-        vertex_t min_point, max_point;
+        vector_t min_point, max_point;
         min_point.x = INFINITY;
         min_point.y = INFINITY;
         max_point.x = -INFINITY;
@@ -162,8 +162,8 @@ map_t *M_Load(const char *name) {
                 goto fail;
             }
             // Precalculate delta.
-            B_VtxCopy(&wall->delta, wall->v2);
-            B_VtxSub(&wall->delta, wall->v1);
+            U_VecCopy(&wall->delta, wall->v2);
+            U_VecSub(&wall->delta, wall->v1);
             // Precalculate normal.
             wall->normal.x = wall->v2->y - wall->v1->y;
             wall->normal.y = wall->v1->x - wall->v2->x;
@@ -194,8 +194,8 @@ map_t *M_Load(const char *name) {
             }
         }
         // Get bounding box of this sector.
-        B_VtxCopy(&sector->bounds.min, &min_point);
-        B_VtxCopy(&sector->bounds.max, &max_point);
+        U_VecCopy(&sector->bounds.min, &min_point);
+        U_VecCopy(&sector->bounds.max, &max_point);
     }
     // Free file data.
     Deallocate(f_vtxs);
@@ -226,54 +226,12 @@ void M_Free(map_t *map) {
     Deallocate(map);
 }
 
-void M_SectorIterNew(sectoriter_t *iter, sector_t *first) {
-    iter->root = first;
-    iter->seen = first;
-    iter->head = first;
-    iter->tail = first;
-}
-
-void M_SectorIterPush(sectoriter_t *iter, sector_t *sector) {
-    if (sector != iter->root && sector->next_seen == NULL) {
-        sector->next_seen = iter->seen;
-        iter->seen = sector;
-
-        if (iter->tail == NULL) {
-            iter->head = sector;
-            iter->tail = sector;
-        } else {
-            iter->tail->next_queue = sector;
-            iter->tail = sector;
-        }
-    }
-}
-
-sector_t *M_SectorIterPop(sectoriter_t *iter) {
-    sector_t *result = iter->head;
-    if (result != NULL) {
-        iter->head = result->next_queue;
-        if (iter->head == NULL) {
-            iter->tail = NULL;
-        }
-    }
-    return result;
-}
-
-void M_SectorIterCleanup(sectoriter_t *iter) {
-    while (iter->seen != NULL) {
-        sector_t *sector = iter->seen;
-        iter->seen = sector->next_seen;
-        sector->next_seen = NULL;
-        sector->next_queue = NULL;
-    }
-}
-
-static bool PointInFrontOfWall(const wall_t *wall, const vertex_t *point) {
+static bool PointInFrontOfWall(const wall_t *wall, const vector_t *point) {
     return (wall->v2->y - wall->v1->y) * (point->x - wall->v1->x) >
         (wall->v2->x - wall->v1->x) * (point->y - wall->v1->y);
 }
 
-bool M_SectorContainsPoint(const sector_t *sector, const vertex_t *point) {
+bool M_SectorContainsPoint(const sector_t *sector, const vector_t *point) {
     for (size_t i = 0; i < sector->num_walls; i++) {
         const wall_t *wall = &sector->walls[i];
         // Test if point lies in front of line.

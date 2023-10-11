@@ -4,9 +4,8 @@
 
 #include "pd_api.h"
 
-#include "map/load.h"
-
-#include "g_map.h"
+#include "m_load.h"
+#include "m_map.h"
 #include "r_draw.h"
 
 PlaydateAPI *playdate;
@@ -14,7 +13,7 @@ PlaydateAPI *playdate;
 static map_t *map = NULL;
 
 static float ang = 0.0f;
-static vertex_t pos = { 0, 0 };
+static vector_t pos = { 0, 0 };
 static sector_t *sector = NULL;
 static bool draw_3d = true;
 
@@ -31,7 +30,7 @@ static int update(void *userdata) {
     if (held & kButtonRight) {
         ang = fmodf(ang + 0.05f, 2.0f * PI);
     }
-    vertex_t delta;
+    vector_t delta;
     if (held & kButtonUp) {
         delta.x = -sinf(-ang) * 4.0f;
         delta.y = cosf(-ang) * 4.0f;

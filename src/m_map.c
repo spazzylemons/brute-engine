@@ -1,12 +1,13 @@
-#include "b_math.h"
-#include "core.h"
-#include "g_map.h"
+#include "b_core.h"
+#include "m_iter.h"
+#include "m_map.h"
+#include "u_vec.h"
 
 #include <math.h>
 
 #define OBJ_RADIUS 20.0f
 
-static sector_t *FindPlayerSector(sector_t *sector, const vertex_t *point) {
+static sector_t *FindPlayerSector(sector_t *sector, const vector_t *point) {
     sectoriter_t iter;
     M_SectorIterNew(&iter, sector);
 
@@ -35,15 +36,15 @@ static sector_t *FindPlayerSector(sector_t *sector, const vertex_t *point) {
 
 static float GetCollisionTime(
     const wall_t* wall,
-    const vertex_t *oc,
-    const vertex_t *delta
+    const vector_t *oc,
+    const vector_t *delta
 ) {
-    vertex_t c;
-    B_VtxCopy(&c, oc);
-    B_VtxScaledAdd(&c, &wall->normal, -OBJ_RADIUS);
+    vector_t c;
+    U_VecCopy(&c, oc);
+    U_VecScaledAdd(&c, &wall->normal, -OBJ_RADIUS);
 
-    const vertex_t *a = wall->v1;
-    const vertex_t *b = wall->v2;
+    const vector_t *a = wall->v1;
+    const vector_t *b = wall->v2;
     float tn = (a->x - c.x) * -delta->y - (a->y - c.y) * -delta->x;
     float un = (a->x - c.x) * (a->y - b->y) - (a->y - c.y) * (a->x - b->x);
     float den = (a->x - b->x) * -delta->y - (a->y - b->y) * -delta->x;
@@ -58,18 +59,18 @@ static float GetCollisionTime(
         return u;
     }
 
-    vertex_t da;
-    B_VtxCopy(&da, oc);
-    B_VtxSub(&da, a);
-    vertex_t db;
-    B_VtxCopy(&db, oc);
-    B_VtxSub(&db, b);
+    vector_t da;
+    U_VecCopy(&da, oc);
+    U_VecSub(&da, a);
+    vector_t db;
+    U_VecCopy(&db, oc);
+    U_VecSub(&db, b);
 
     // Try to see if there's a point that the left/right endpoints graze the circle.
-    float qa = B_VtxLenSq(delta);
+    float qa = U_VecLenSq(delta);
     if (qa != 0.0f) {
-        float qb = B_VtxDot(&da, delta);
-        float qc = B_VtxDot(&da, &da) - (OBJ_RADIUS * OBJ_RADIUS);
+        float qb = U_VecDot(&da, delta);
+        float qc = U_VecDot(&da, &da) - (OBJ_RADIUS * OBJ_RADIUS);
         float disc = qb * qb - qa * qc;
         if (disc >= 0.0f) {
             float q = (-qb - sqrtf(disc)) / qa;
@@ -77,8 +78,8 @@ static float GetCollisionTime(
                 return q;
             }
         }
-        qb = B_VtxDot(&db, delta);
-        qc = B_VtxDot(&db, &db) - (OBJ_RADIUS * OBJ_RADIUS);
+        qb = U_VecDot(&db, delta);
+        qc = U_VecDot(&db, &db) - (OBJ_RADIUS * OBJ_RADIUS);
         disc = qb * qb - qa * qc;
         if (disc >= 0.0f) {
             float q = (-qb - sqrtf(disc)) / qa;
@@ -92,8 +93,8 @@ static float GetCollisionTime(
 }
 
 static const wall_t *SectorCollide(
-    vertex_t *pos,
-    vertex_t *delta,
+    vector_t *pos,
+    vector_t *delta,
     sector_t *sector
 ) {
     const wall_t *closest = NULL;
@@ -134,7 +135,7 @@ static const wall_t *SectorCollide(
                 continue;
             }
 
-            if (B_VtxDot(&wall->normal, delta) >= 0.0f) {
+            if (U_VecDot(&wall->normal, delta) >= 0.0f) {
                 continue;
             }
 
@@ -149,15 +150,15 @@ static const wall_t *SectorCollide(
     // Check the closest wall collision.
     if (closest != NULL) {
         // We hit the wall. Move position to touch wall.
-        B_VtxScaledAdd(pos, delta, closest_distance);
+        U_VecScaledAdd(pos, delta, closest_distance);
         // Do wall sliding.
-        vertex_t slide;
-        B_VtxCopy(&slide, closest->v2);
-        B_VtxSub(&slide, closest->v1);
-        B_VtxNormalize(&slide);
-        float slidefac = B_VtxDot(&slide, delta);
-        B_VtxScale(delta, closest_distance);
-        B_VtxScaledAdd(delta, &slide, (1.0f - closest_distance) * slidefac);
+        vector_t slide;
+        U_VecCopy(&slide, closest->v2);
+        U_VecSub(&slide, closest->v1);
+        U_VecNormalize(&slide);
+        float slidefac = U_VecDot(&slide, delta);
+        U_VecScale(delta, closest_distance);
+        U_VecScaledAdd(delta, &slide, (1.0f - closest_distance) * slidefac);
     }
 
     M_SectorIterCleanup(&iter);
@@ -165,21 +166,21 @@ static const wall_t *SectorCollide(
     return closest;
 }
 
-sector_t *G_MoveAndSlide(sector_t *sector, vertex_t *pos, vertex_t *delta) {
+sector_t *G_MoveAndSlide(sector_t *sector, vector_t *pos, vector_t *delta) {
     // failsafe - only allow so many sector changes
     // this hasn't been triggered to my knowledge and may not be useful
     uint8_t changes_left = 5;
-    while (changes_left-- && B_VtxLenSq(delta) > 0.0001f) {
-        vertex_t old_delta;
-        B_VtxCopy(&old_delta, delta);
+    while (changes_left-- && U_VecLenSq(delta) > 0.0001f) {
+        vector_t old_delta;
+        U_VecCopy(&old_delta, delta);
         const wall_t *wall = SectorCollide(pos, delta, sector);
         if (wall != NULL) {
-            if (wall->portal == NULL && B_VtxDistSq(delta, &old_delta) < 0.0001f) {
+            if (wall->portal == NULL && U_VecDistSq(delta, &old_delta) < 0.0001f) {
                 break;
             }
             sector = FindPlayerSector(sector, pos);
         } else {
-            B_VtxAdd(pos, delta);
+            U_VecAdd(pos, delta);
             sector = FindPlayerSector(sector, pos);
             break;
         }

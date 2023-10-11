@@ -1,6 +1,7 @@
-#include "b_math.h"
-#include "core.h"
+#include "b_core.h"
+#include "m_iter.h"
 #include "r_draw.h"
+#include "u_vec.h"
 
 #include <stdbool.h>
 
@@ -44,7 +45,7 @@ static const uint8_t shades[17][4] = {
     DitherPattern(0xf, 0xf, 0xf, 0xf),
 };
 
-static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *pos, float ang) {
+static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vector_t *pos, float ang) {
     // Find the corners of this wall.
     float ax = wall->v1->x - pos->x;
     float ay = wall->v1->y - pos->y;
@@ -172,7 +173,7 @@ static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vertex_t *p
     return false;
 }
 
-bool DrawWallAutoMap(const wall_t *wall, const vertex_t *pos, float ang) {
+bool DrawWallAutoMap(const wall_t *wall, const vector_t *pos, float ang) {
     // Find the corners of this wall.
     float ax = wall->v1->x - pos->x;
     float ay = wall->v1->y - pos->y;
@@ -189,7 +190,7 @@ bool DrawWallAutoMap(const wall_t *wall, const vertex_t *pos, float ang) {
     }
 }
 
-void R_DrawSector(uint8_t *framebuffer, sector_t *sector, const vertex_t *pos, float ang) {
+void R_DrawSector(uint8_t *framebuffer, sector_t *sector, const vector_t *pos, float ang) {
     // Clear all columns.
     memset(FilledColumns, 0, sizeof(FilledColumns));
     // Iterate.
@@ -214,7 +215,7 @@ void R_DrawSector(uint8_t *framebuffer, sector_t *sector, const vertex_t *pos, f
     playdate->graphics->markUpdatedRows(0, LCD_ROWS - 1);
 }
 
-void R_DrawAutoMap(sector_t *sector, const vertex_t *pos, float ang) {
+void R_DrawAutoMap(sector_t *sector, const vector_t *pos, float ang) {
     // Iterate.
     sectoriter_t iter;
     M_SectorIterNew(&iter, sector);

@@ -1,5 +1,5 @@
-#ifndef BRUTE_CORE_H
-#define BRUTE_CORE_H
+#ifndef BRUTE_B_CORE_H
+#define BRUTE_B_CORE_H
 
 #include "pd_api.h"
 
