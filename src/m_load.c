@@ -1,5 +1,8 @@
 #include "b_core.h"
 #include "m_load.h"
+#include "u_error.h"
+#include "u_file.h"
+#include "u_format.h"
 #include "u_vec.h"
 
 // Just in case, we'll pack the structs we read from the files.
@@ -31,198 +34,132 @@ typedef struct PACKED {
     uint16_t portal;
 } file_wall_t;
 
-// Refuse to allocate and read a file larger than this.
-#define MAX_SLURP_SIZE 1048576
-
-// Slurp a file's contents. Returns a pointer to the contents and the size of the allocation.
-// TODO this should be a utility file elsewhere.
-static void *SlurpFile(const char *path, size_t *szp) {
-    // How much data are we reading?
-    FileStat stat;
-    if (playdate->file->stat(path, &stat)) {
-        return NULL;
-    }
-    // Avoid reading if too big.
-    if (stat.size > MAX_SLURP_SIZE) {
-        return NULL;
-    }
-    // Allocate the buffer to store that data.
-    void *buffer = Allocate(stat.size);
-    if (buffer == NULL) {
-        return NULL;
-    }
-    // Read the data from the file.
-    SDFile *file = playdate->file->open(path, kFileRead);
-    if (file != NULL) {
-        int bytes_read = playdate->file->read(file, buffer, stat.size);
-        playdate->file->close(file);
-        if (bytes_read == (int) stat.size) {
-            if (szp != NULL) {
-                *szp = stat.size;
-            }
-            return buffer;
-        }
-    }
-    Deallocate(buffer);
-    return NULL;
-}
-
-static void *SlurpMap(const char *name, const char *file, size_t *szp, size_t mbsz) {
-    // Allocate map path.
-    char *path = NULL;
-    playdate->system->formatString(&path, "/maps/%s/%s", name, file);
-    if (path == NULL) {
-        return NULL;
-    }
+static void *ReadMapFile(const char *name, const char *file, size_t *szp, size_t mbsz) {
+    // Format map path.
+    char pathbuf[64];
+    FormatString(pathbuf, sizeof(pathbuf), "/maps/%s/%s", name, file);
     // Read file.
-    void *result = SlurpFile(path, szp);
-    Deallocate(path);
-    // If successful, divide size by member count.
-    if (result != NULL) {
-        *szp /= mbsz;
-    }
+    void *result = U_FileRead(pathbuf, szp);
+    // Divide size by member count.
+    *szp /= mbsz;
+    // Return file contents.
     return result;
 }
 
-map_t *M_Load(const char *name) {
-    // File data.
-    size_t num_vtxs, num_scts, num_walls;
-    file_vertex_t *f_vtxs;
-    file_sector_t *f_scts;
-    file_wall_t *f_walls;
-    // Map data.
-    vector_t *vtxs = NULL;
-    sector_t *scts = NULL;
-    wall_t *walls = NULL;
-    map_t *map = NULL;
-    // Read the files.
-    f_vtxs = SlurpMap(name, "vertices", &num_vtxs, sizeof(file_vertex_t));
-    f_scts = SlurpMap(name, "sectors", &num_scts, sizeof(file_sector_t));
-    f_walls = SlurpMap(name, "walls", &num_walls, sizeof(file_wall_t));
-    // If any failed, stop.
-    if (f_vtxs == NULL || f_scts == NULL || f_walls == NULL) {
-        goto fail;
-    }
-    // If no sectors, stop.
-    if (num_scts == 0) {
-        goto fail;
-    }
-    // Allocate data structures.
-    vtxs = Allocate(sizeof(vector_t) * num_vtxs);
-    scts = Allocate(sizeof(sector_t) * num_scts);
-    walls = Allocate(sizeof(wall_t) * num_walls);
-    map = Allocate(sizeof(map_t));
-    // If any failed, stop.
-    if (vtxs == NULL || scts == NULL || walls == NULL) {
-        goto fail;
-    }
+static void LoadVertices(const char *name, map_t *map) {
+    file_vertex_t *fvtxs = ReadMapFile(name, "vertices", &map->numvtxs, sizeof(file_vertex_t));
+    // Allocate vertices.
+    map->vtxs = Allocate(sizeof(vector_t) * map->numvtxs);
     // Convert vertices.
-    for (size_t i = 0; i < num_vtxs; i++) {
-        vtxs[i].x = f_vtxs[i].x;
-        vtxs[i].y = f_vtxs[i].y;
+    for (size_t i = 0; i < map->numvtxs; i++) {
+        map->vtxs[i].x = fvtxs[i].x;
+        map->vtxs[i].y = fvtxs[i].y;
     }
+    // Free file data.
+    Deallocate(fvtxs);
+}
+
+static void LoadWalls(const char *name, map_t *map) {
+    file_wall_t *fwalls = ReadMapFile(name, "walls", &map->numwalls, sizeof(file_wall_t));
+    // Allocate walls.
+    map->walls = Allocate(sizeof(wall_t) * map->numwalls);
+    // Convert walls. Not all data is validated until sectors are converted.
+    for (size_t i = 0; i < map->numwalls; i++) {
+        file_wall_t *fwall = &fwalls[i];
+        wall_t *wall = &map->walls[i];
+        // Check bounds of wall vertex.
+        if (fwall->vertex >= map->numvtxs) {
+            Error("M_Load: Vertices of wall %d are out of bounds", i);
+        }
+        // Store vertex 1. Vertex 2 cannot be set until sectors are converted.
+        wall->v1 = &map->vtxs[fwall->vertex];
+        // Store the portal index directly into the portal pointer. The sector
+        // conversion routine will finish the conversion.
+        wall->portal = (void *) (uintptr_t) fwall->portal;
+    }
+    // Free file data.
+    Deallocate(fwalls);
+}
+
+static void LoadSectors(const char *name, map_t *map) {
+    file_sector_t *fscts = ReadMapFile(name, "sectors", &map->numscts, sizeof(file_sector_t));
+    // This error will be obsolete once actors are supported.
+    if (map->numscts == 0) {
+        Error("Map has no sectors.");
+    }
+    // Allocate sectors.
+    map->scts = Allocate(sizeof(sector_t) * map->numscts);
     // Convert sectors.
-    for (size_t i = 0; i < num_scts; i++) {
-        file_sector_t *f_sector = &f_scts[i];
-        sector_t *sector = &scts[i];
-        // Initialize iterator lists.
-        sector->next_seen = NULL;
-        sector->next_queue = NULL;
-        // Must have at least three sides.
-        if (f_sector->num_walls < 3) {
-            goto fail;
+    for (size_t i = 0; i < map->numscts; i++) {
+        file_sector_t *fsector = &fscts[i];
+        sector_t *sector = &map->scts[i];
+        // Check that the sector is a polygon.
+        if (fsector->num_walls < 3) {
+            Error("M_Load: Sector %d is not a polygon", i);
         }
-        // Wall array must be in bounds.
-        size_t wall_start = f_sector->first_wall;
-        size_t wall_end = wall_start + f_sector->num_walls;
-        if (wall_end > num_walls) {
-            goto fail;
+        // Check that the wall slice is in bounds.
+        size_t wstart = fsector->first_wall;
+        size_t wend = wstart + fsector->num_walls;
+        if (wend > map->numwalls) {
+            Error("M_Load: Walls of sector %d are out of bounds", i);
         }
-        // Copy wall count and pointer.
-        sector->num_walls = f_sector->num_walls;
-        sector->walls = &walls[f_sector->first_wall];
-        // Convert walls in this sector.
-        vector_t min_point, max_point;
-        min_point.x = INFINITY;
-        min_point.y = INFINITY;
-        max_point.x = -INFINITY;
-        max_point.y = -INFINITY;
+        // Finish converting the walls, and find the bounding box.
+        sector->walls = &map->walls[fsector->first_wall];
+        sector->num_walls = fsector->num_walls;
+        sector->bounds.min.x = INFINITY;
+        sector->bounds.min.y = INFINITY;
+        sector->bounds.max.x = -INFINITY;
+        sector->bounds.max.y = -INFINITY;
         for (size_t j = 0; j < sector->num_walls; j++) {
-            file_wall_t *f_wall = &f_walls[f_sector->first_wall + j];
-            file_wall_t *f_next = &f_walls[f_sector->first_wall + (j + 1) % sector->num_walls];
             wall_t *wall = &sector->walls[j];
-            // Wall vertex indices must be within bounds.
-            if (f_wall->vertex >= num_vtxs || f_next->vertex >= num_vtxs) {
-                goto fail;
-            }
-            wall->v1 = &vtxs[f_wall->vertex];
-            wall->v2 = &vtxs[f_next->vertex];
+            wall_t *next = &sector->walls[(j + 1) % sector->num_walls];
+            wall->v2 = next->v1;
             // Wall must have a nonzero length.
-            if (wall->v1->x == wall->v2->x && wall->v1->y == wall->v2->y) {
-                goto fail;
+            if (U_VecDistSq(wall->v1, wall->v2) == 0.0f) {
+                Error("M_Load: Wall %d of sector %d has zero length", j, i);
             }
             // Precalculate delta.
             U_VecCopy(&wall->delta, wall->v2);
             U_VecSub(&wall->delta, wall->v1);
             // Precalculate normal.
-            wall->normal.x = wall->v2->y - wall->v1->y;
-            wall->normal.y = wall->v1->x - wall->v2->x;
-            float nlength = sqrtf(wall->normal.x * wall->normal.x + wall->normal.y * wall->normal.y);
-            wall->normal.x /= nlength;
-            wall->normal.y /= nlength;
+            wall->normal.x = wall->delta.y;
+            wall->normal.y = -wall->delta.x;
+            U_VecNormalize(&wall->normal);
             // Check for bounding box.
-            if (wall->v1->x < min_point.x) {
-                min_point.x = wall->v1->x;
-            }
-            if (wall->v1->x > max_point.x) {
-                max_point.x = wall->v1->x;
-            }
-            if (wall->v1->y < min_point.y) {
-                min_point.y = wall->v1->y;
-            }
-            if (wall->v1->y > max_point.y) {
-                max_point.y = wall->v1->y;
-            }
+            AABBExpandToFit(&sector->bounds, wall->v1);
             // Wall portal index must be within bounds.
-            if (f_wall->portal != i) {
-                if (f_wall->portal >= num_scts) {
-                    goto fail;
+            size_t portalindex = (uintptr_t) wall->portal;
+            if (portalindex != i) {
+                if (portalindex >= map->numscts) {
+                    Error("M_Load: Portal index of wall %d of sector %d is out of bounds", j, i);
                 }
-                wall->portal = &scts[f_wall->portal];
+                wall->portal = &map->scts[portalindex];
             } else {
                 wall->portal = NULL;
             }
         }
-        // Get bounding box of this sector.
-        U_VecCopy(&sector->bounds.min, &min_point);
-        U_VecCopy(&sector->bounds.max, &max_point);
+        // Initialize iterator lists.
+        sector->next_seen = NULL;
+        sector->next_queue = NULL;
     }
     // Free file data.
-    Deallocate(f_vtxs);
-    Deallocate(f_scts);
-    Deallocate(f_walls);
-    // Successful conversion. Create and return map object.
-    map->vtxs = vtxs;
-    map->scts = scts;
-    map->walls = walls;
+    Deallocate(fscts);
+}
+
+map_t *M_Load(const char *name) {
+    // Allocate map.
+    map_t *map = Allocate(sizeof(map_t));
+    // Load each part of the map.
+    LoadVertices(name, map);
+    LoadWalls(name, map);
+    LoadSectors(name, map);
     return map;
-fail:
-    // Free file data.
-    Deallocate(f_vtxs);
-    Deallocate(f_scts);
-    Deallocate(f_walls);
-    // Free vertex data.
-    Deallocate(vtxs);
-    Deallocate(scts);
-    Deallocate(walls);
-    Deallocate(map);
-    return NULL;
 }
 
 void M_Free(map_t *map) {
     Deallocate(map->vtxs);
-    Deallocate(map->scts);
     Deallocate(map->walls);
+    Deallocate(map->scts);
     Deallocate(map);
 }
 

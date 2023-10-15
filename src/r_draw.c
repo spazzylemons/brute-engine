@@ -136,13 +136,15 @@ static bool DrawWall(uint8_t *framebuffer, const wall_t *wall, const vector_t *p
     // Draw rectangle.
     uint8_t *buf = &framebuffer[x1 >> 3];
     uint8_t mask1 = 1 << (7 - (x1 & 7));
+    int den = x2 - x1 + 1;
+    int num = byi - ayi;
     for (int x = x1; x <= x2; x++) {
         int index = x >> 3;
         int mask = 1 << (x & 7);
         if ((FilledColumns[index] & mask) == 0) {
             FilledColumns[index] |= mask;
-            // This division is designed specifically to avoid dividing byi zero.
-            int y = ayi + (((x - x1) * (byi - ayi)) / (x2 - x1 + 1));
+            // This division is designed specifically to avoid dividing by zero.
+            int y = ayi + ((x - x1) * num) / den;
             // Figure out temporary shade of column.
             int shade = y >> 3;
             if (shade < 0) {

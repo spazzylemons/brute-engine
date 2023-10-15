@@ -8,26 +8,31 @@
 #include "m_load.h"
 #include "m_map.h"
 #include "r_draw.h"
+#include "u_error.h"
 
 PlaydateAPI *playdate;
 
 static map_t *map = NULL;
-
 static actor_t *player = NULL;
-// static bool draw_3d = true;
 
-#define PI 3.141592653589793f
+static bool haderror = false;
 
 static int update(void *userdata) {
     (void) userdata;
 
-    if (player != NULL) {
+    if (haderror) {
+        return 0;
+    }
+
+    if (CatchError()) {
+        haderror = true;
+        DisplayError();
+    } else {
         player->class->update(player);
         playdate->graphics->clear(kColorBlack);
         R_DrawSector(playdate->graphics->getFrame(), player->sector, &player->pos, player->angle);
+        playdate->system->drawFPS(0, 0);
     }
-
-    playdate->system->drawFPS(0, 0);
 
     return 1;
 }
@@ -41,8 +46,11 @@ int eventHandler(PlaydateAPI *pd, PDSystemEvent event, uint32_t arg) {
     if (event == kEventInit) {
         playdate = pd;
         playdate->system->setUpdateCallback(update, NULL);
-        map = M_Load("map01");
-        if (map != NULL) {
+        if (CatchError()) {
+            haderror = true;
+            DisplayError();
+        } else {
+            map = M_Load("map01");
             vector_t pos;
             pos.x = 0.0f;
             pos.y = 0.0f;

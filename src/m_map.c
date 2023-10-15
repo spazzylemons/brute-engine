@@ -129,7 +129,7 @@ static const wall_t *SectorCollide(
             // Don't collide with portals. Instead, check their sectors if we
             // may collide with the sector's walls.
             if (wall->portal != NULL) {
-                if (B_AABBOverlap(&player_bounds, &wall->portal->bounds)) {
+                if (AABBOverlap(&player_bounds, &wall->portal->bounds)) {
                     M_SectorIterPush(&iter, wall->portal);
                 }
                 continue;

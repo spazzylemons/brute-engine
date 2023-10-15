@@ -3,6 +3,7 @@
 
 #include "u_aabb.h"
 
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct {
@@ -34,10 +35,16 @@ typedef struct sector_t {
 typedef struct {
     // The vertices in this map.
     vector_t *vtxs;
+    // The number of vertices in this map.
+    size_t numvtxs;
     // The sectors in this map.
     sector_t *scts;
+    // The number of sectors in this map.
+    size_t numscts;
     // The walls in this map.
     wall_t *walls;
+    // The number of walls in this map.
+    size_t numwalls;
 } map_t;
 
 // Test if a point is inside a sector.

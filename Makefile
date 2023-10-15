@@ -36,6 +36,9 @@ SRC = \
 	src/m_map.c \
 	src/r_draw.c \
 	src/u_aabb.c \
+	src/u_error.c \
+	src/u_file.c \
+	src/u_format.c \
 	src/u_math.c \
 	src/u_vec.c
 

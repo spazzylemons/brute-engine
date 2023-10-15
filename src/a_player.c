@@ -1,6 +1,7 @@
 #include "a_classes.h"
 #include "b_core.h"
 #include "m_map.h"
+#include "u_error.h"
 #include "u_math.h"
 
 static void Update(actor_t *this) {
@@ -23,6 +24,10 @@ static void Update(actor_t *this) {
     } else {
         delta.x = 0.0f;
         delta.y = 0.0f;
+    }
+
+    if (held & kButtonA) {
+        Error("this is a test! %d", 123);
     }
 
     this->sector = M_MoveAndSlide(this->sector, &this->pos, &delta);
