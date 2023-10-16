@@ -5,30 +5,39 @@
 
 #include <stdbool.h>
 
-static void RotatePoint(float *x, float *y, float ang) {
-    // TODO inefficient - sin and cos are recalculated way too often
-    float s = sinf(-ang);
-    float c = cosf(-ang);
-    float new_x  = *x * c - *y * s;
-    *y = *x * s + *y * c;
-    *x = new_x;
-}
+// Render position.
+static vector_t renderpos;
+// Render angle.
+static float renderangle;
+// Playdate framebuffer.
+static uint8_t *__attribute__((aligned(4))) renderbuf;
+// Pointer to current column.
+static uint8_t *rendercol;
+// Mask for current column.
+static uint8_t renderxmask;
+// The current sector.
+static const sector_t *rendersector;
+// The current wall.
+static const wall_t *renderwall;
+// Sine multiply for flats.
+static int32_t flatsine;
+// Cosine multiply for flats.
+static int32_t flatcosine;
+// Sine multiply for wall rotation.
+static float wallsine;
+// Cosine multiply for wall rotation.
+static float wallcosine;
 
 static void NewRotatePoint(vector_t *v, float ang) {
-    // TODO inefficient - sin and cos are recalculated way too often
-    float s = sinf(-ang);
-    float c = cosf(-ang);
-    float x = v->x * c - v->y * s;
-    v->y = v->x * s + v->y * c;
+    float x = v->x * wallcosine - v->y * wallsine;
+    v->y = v->x * wallsine + v->y * wallcosine;
     v->x = x;
 }
 
-// Set to 0 when drawing starts. Each bit represents a column that has been drawn in.
-// This is used to prevent overdraw.
-static uint8_t FilledColumns[LCD_COLUMNS >> 3];
-
 // Half of the screen X resolution.
 #define SCRNDIST 200.0f
+// Integer version of SCRNDIST.
+#define SCRNDISTI 200
 
 #define DitherPattern(a, b, c, d) { a * 0x11, b * 0x11, c * 0x11, d * 0x11 }
 
@@ -55,10 +64,41 @@ static const uint8_t shades[17][4] = {
 // Stride of rows in framebuffer.
 #define ROWSTRIDE 52
 
+// y position of floor
+#define FLOORHEIGHT -32.0f
+
+// Integer version of FLOORHEIGHT.
+#define FLOORHEIGHTI -32
+
+// Draw a floor.
+static void DrawFlat(int32_t x, int32_t y, int32_t endy, int32_t offscale) {
+    // Avoid division by zero just in case.
+    if (y == 120) ++y;
+    // Get location in framebuffer to draw to.
+    uint8_t *framebuffer = rendercol + (ROWSTRIDE * y);
+    int32_t offx = floorf(renderpos.x * 256.0f) * offscale;
+    int32_t offy = floorf(renderpos.y * 256.0f) * -offscale;
+    int32_t uvx = (SCRNDISTI - x) << 8;
+    int32_t uvy = SCRNDISTI << 8;
+    int32_t foox = FLOORHEIGHTI * (uvx * flatcosine - uvy * flatsine);
+    int32_t fooy = FLOORHEIGHTI * (uvx * flatsine + uvy * flatcosine);
+    for (; y < endy; y++) {
+        int32_t den = (y - 120) * SCRNDISTI;
+        uint16_t newx = ((foox / den + offx) >> 8) & 63;
+        uint16_t newy = ((fooy / den + offy) >> 8) & 63;
+        uint8_t flatmask = 1 << (7 - (newx & 7));
+        uint16_t flatindex = (newx >> 3) + (newy * 8);
+        if (rendersector->floor->data[flatindex] & flatmask) {
+            *framebuffer |= renderxmask;
+        } else {
+            *framebuffer &= ~renderxmask;
+        }
+        framebuffer += ROWSTRIDE;
+    }
+}
+
 // Draw a column.
 static void DrawColumn(
-    // Framebuffer row to draw to.
-    uint8_t *framebuffer,
     // Column of patch to draw.
     const uint8_t *source,
     // Height of column patch.
@@ -66,9 +106,7 @@ static void DrawColumn(
     // The top Y coordinate.
     int32_t y1,
     // The bottom Y coordinate.
-    int32_t y2,
-    // The X mask.
-    uint8_t xmask
+    int32_t y2
 ) {
     // Convert scale to mask.
     scale -= 1;
@@ -76,7 +114,7 @@ static void DrawColumn(
     int32_t offset = y1;
     if (y1 < 0) y1 = 0;
     if (y2 > 240) y2 = 240;
-    framebuffer += ROWSTRIDE * y1;
+    uint8_t *framebuffer = rendercol + (ROWSTRIDE * y1);
     // For speed, calculate fixed-point accumulator instead of repeated multiply and divide.
     int32_t fracstep = (scale << 16) / den;
     int32_t frac = ((scale * (y1 - offset)) << 16) / den;
@@ -86,7 +124,9 @@ static void DrawColumn(
         int32_t ymask = 1 << (7 - (whichy & 7));
         int32_t yindex = whichy >> 3;
         if (source[yindex] & ymask) {
-            *framebuffer |= xmask;
+            *framebuffer |= renderxmask;
+        } else {
+            *framebuffer &= ~renderxmask;
         }
         frac += fracstep;
         framebuffer += ROWSTRIDE;
@@ -94,8 +134,6 @@ static void DrawColumn(
 }
 
 static void DrawWallColumns(
-    uint8_t *framebuffer,
-    const patch_t *patch,
     int32_t x1,
     int32_t y1,
     int32_t x2,
@@ -105,7 +143,7 @@ static void DrawWallColumns(
     float za,
     float zb
 ) {
-    // Sort byi X position for easier clipping.
+    // Sort by X position for easier clipping.
     if (x1 > x2) {
         int32_t temp;
         temp = x1;
@@ -126,8 +164,8 @@ static void DrawWallColumns(
     x1 += 200;
     x2 += 200;
     // Draw columns.
-    uint8_t *buf = &framebuffer[x1 >> 3];
-    uint8_t mask1 = 1 << (7 - (x1 & 7));
+    rendercol = &renderbuf[x1 >> 3];
+    renderxmask = 1 << (7 - (x1 & 7));
     int32_t den = x2 - x1;
     int32_t num = y2 - y1;
     x2 -= x1;
@@ -137,6 +175,7 @@ static void DrawWallColumns(
     int32_t zb1 = floorf(zb);
     int32_t du = ub1 - ua1;
     int32_t dz = zb1 - za1;
+    const patch_t *patch = renderwall->patch;
     for (int32_t x = 0; x < x2; x++) {
         int32_t num1 = du * (za1 * x);
         int32_t den1 = (zb1 * x2) - x * dz;
@@ -144,41 +183,34 @@ static void DrawWallColumns(
         int32_t y = y1 + (x * num) / den;
         int32_t ay1 = 120 - y;
         int32_t ay2 = 120 + y;
+        DrawFlat(x + x1, 0, ay1, -1);
         DrawColumn(
-            buf,
             &patch->data[whichx * patch->stride],
             patch->height,
             ay1,
-            ay2,
-            mask1
+            ay2
         );
-        mask1 >>= 1;
-        if (mask1 == 0) {
-            ++buf;
-            mask1 = 0x80;
+        DrawFlat(x + x1, ay2, 240, 1);
+        renderxmask >>= 1;
+        if (renderxmask == 0) {
+            ++rendercol;
+            renderxmask = 0x80;
         }
     }
 }
 
-static bool DrawWall(
-    uint8_t *framebuffer,
-    const wall_t *wall,
-    const vector_t *pos,
-    float ang,
-    float *left,
-    float *right
-) {
+static bool DrawWall(float *left, float *right) {
     // Find the corners of this wall.
     vector_t a, b;
-    U_VecCopy(&a, wall->v1);
-    U_VecCopy(&b, wall->v2);
-    U_VecSub(&a, pos);
-    U_VecSub(&b, pos);
-    NewRotatePoint(&a, ang);
-    NewRotatePoint(&b, ang);
+    U_VecCopy(&a, renderwall->v1);
+    U_VecCopy(&b, renderwall->v2);
+    U_VecSub(&a, &renderpos);
+    U_VecSub(&b, &renderpos);
+    NewRotatePoint(&a, renderangle);
+    NewRotatePoint(&b, renderangle);
     // Find UVs of this wall.
-    float ua = wall->xoffset;
-    float ub = ua + wall->length;
+    float ua = renderwall->xoffset;
+    float ub = ua + renderwall->length;
     // TODO clean up this code.
     vector_t d;
     U_VecCopy(&d, &b);
@@ -251,7 +283,7 @@ static bool DrawWall(
         return false;
     }
     // If this is a portal, don't render it.
-    if (wall->portal != NULL) {
+    if (renderwall->portal != NULL) {
         *left = nca;
         *right = ncb;
         return true;
@@ -262,77 +294,38 @@ static bool DrawWall(
     int32_t ayi = floorf((SCRNDIST * 32.0f) / a.y);
     int32_t byi = floorf((SCRNDIST * 32.0f) / b.y);
     // Draw columns.
-    DrawWallColumns(framebuffer, wall->patch, axi, ayi, bxi, byi, ua, ub, a.y, b.y);
+    DrawWallColumns(axi, ayi, bxi, byi, ua, ub, a.y, b.y);
     return false;
 }
 
-bool DrawWallAutoMap(const wall_t *wall, const vector_t *pos, float ang) {
-    // Find the corners of this wall.
-    float ax = wall->v1->x - pos->x;
-    float ay = wall->v1->y - pos->y;
-    RotatePoint(&ax, &ay, ang);
-    float bx = wall->v2->x - pos->x;
-    float by = wall->v2->y - pos->y;
-    RotatePoint(&bx, &by, ang);
-    // Naive line drawing for now.
-    if (wall->portal != NULL) {
-        return true;
-    } else {
-        playdate->graphics->drawLine(ax + 200.0f, 120.0f - ay, bx + 200.0f, 120.0f - by, 1, kColorWhite);
-        return false;
-    }
-}
-
-static void DrawSectorRecursive(
-    uint8_t *framebuffer,
-    sector_t *sector,
-    const vector_t *pos,
-    float ang,
-    float left,
-    float right
-) {
+static void DrawSectorRecursive(sector_t *sector, float left, float right) {
+    rendersector = sector;
     // Check each wall in the sector.
     for (size_t i = 0; i < sector->num_walls; i++) {
-        const wall_t *wall = &sector->walls[i];
+        renderwall = &sector->walls[i];
         // Bounds of wall.
         float nleft = left;
         float nright = right;
         // Check if portal should be drawn.
-        bool draw_portal = DrawWall(framebuffer, wall, pos, ang, &nleft, &nright);
+        bool draw_portal = DrawWall(&nleft, &nright);
         if (draw_portal && fabsf(nleft - nright) >= 0.5f) {
             // If it should be drawn, draw it recursively using clipped bounds.
-            DrawSectorRecursive(framebuffer, wall->portal, pos, ang, nleft, nright);
+            DrawSectorRecursive(renderwall->portal, nleft, nright);
         }
     }
 }
 
-void R_DrawSector(uint8_t *framebuffer, sector_t *sector, const vector_t *pos, float ang) {
-    // Clear all columns.
-    memset(FilledColumns, 0, sizeof(FilledColumns));
-    DrawSectorRecursive(framebuffer, sector, pos, ang, -200.0f, 200.0f);
+void R_DrawSector(sector_t *sector, const vector_t *pos, float ang) {
+    // Set globals.
+    U_VecCopy(&renderpos, pos);
+    renderangle = ang;
+    wallsine = sinf(-renderangle);
+    wallcosine = cosf(-renderangle);
+    flatsine = floorf(wallsine * SCRNDIST);
+    flatcosine = floorf(wallcosine * SCRNDIST);
+    renderbuf = playdate->graphics->getFrame();
+    // Run recursive sector drawing.
+    DrawSectorRecursive(sector, -200.0f, 200.0f);
     // Notify the system that we've drawn over the framebuffer.
     playdate->graphics->markUpdatedRows(0, LCD_ROWS - 1);
-}
-
-void R_DrawAutoMap(sector_t *sector, const vector_t *pos, float ang) {
-    // Iterate.
-    sectoriter_t iter;
-    M_SectorIterNew(&iter, sector);
-    // While the queue is not empty...
-    while ((sector = M_SectorIterPop(&iter)) != NULL) {
-        // Check each wall in the queue.
-        for (size_t i = 0; i < sector->num_walls; i++) {
-            const wall_t *wall = &sector->walls[i];
-            bool draw_portal = DrawWallAutoMap(wall, pos, ang);
-            if (draw_portal) {
-                // If the wall is a portal, push it.
-                sector_t *portal = wall->portal;
-                M_SectorIterPush(&iter, portal);
-            }
-        }
-    }
-    // Clean up linked lists.
-    M_SectorIterCleanup(&iter);
-    // Draw a circle in the center to debug collision.
-    playdate->graphics->drawEllipse(180, 100, 40, 40, 1, 0.0f, 0.0f, kColorWhite);
 }

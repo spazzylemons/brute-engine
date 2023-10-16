@@ -149,9 +149,36 @@ static void LoadSectors(const char *name, map_t *map) {
         // Initialize iterator lists.
         sector->next_seen = NULL;
         sector->next_queue = NULL;
+        // Set flats.
+        sector->floor = map->flats;
     }
     // Free file data.
     Deallocate(fscts);
+}
+
+// Load a flat from a bitmap.
+static flat_t *LoadFlat(const char *path) {
+    // Load the bitmap.
+    const char *err = NULL;
+    LCDBitmap *bitmap = playdate->graphics->loadBitmap(path, &err);
+    if (bitmap == NULL) {
+        Error("M_Load: Failed to load flat '%s': %s", path, err);
+    }
+    // Get the texture dimensions, checking bounds.
+    int width, height, rowbytes;
+    uint8_t *mask, *data;
+    playdate->graphics->getBitmapData(bitmap, &width, &height, &rowbytes, &mask, &data);
+    if (width != 64 || height != 64) {
+        Error("M_Load: Flat '%s' is not 64x64", path);
+    }
+    // Allocate the flat.
+    flat_t *flat = Allocate(sizeof(flat_t));
+    flat->next = NULL;
+    memcpy(&flat->data[0], data, sizeof(flat->data));
+    // Free the bitmap.
+    playdate->graphics->freeBitmap(bitmap);
+    // Return the new flat.
+    return flat;
 }
 
 // Load a patch from a bitmap.
@@ -203,8 +230,9 @@ static patch_t *LoadPatch(const char *path) {
 map_t *M_Load(const char *name) {
     // Allocate map.
     map_t *map = Allocate(sizeof(map_t));
-    // Load the texture.
+    // Load the textures.
     map->patches = LoadPatch("textures/wall");
+    map->flats = LoadFlat("textures/floor");
     // Load each part of the map.
     LoadVertices(name, map);
     LoadWalls(name, map);
@@ -217,6 +245,7 @@ void M_Free(map_t *map) {
     Deallocate(map->walls);
     Deallocate(map->scts);
     Deallocate(map->patches);
+    Deallocate(map->flats);
     Deallocate(map);
 }
 

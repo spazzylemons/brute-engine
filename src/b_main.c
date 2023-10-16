@@ -29,8 +29,7 @@ static int update(void *userdata) {
         DisplayError();
     } else {
         player->class->update(player);
-        playdate->graphics->clear(kColorBlack);
-        R_DrawSector(playdate->graphics->getFrame(), player->sector, &player->pos, player->angle);
+        R_DrawSector(player->sector, &player->pos, player->angle);
         playdate->system->drawFPS(0, 0);
     }
 

@@ -20,6 +20,14 @@ typedef struct patch_s {
     uint8_t data[0];
 } patch_t;
 
+// A floor/ceiling texture, or "flat". All flats are 64x64 pixels in size.
+typedef struct flat_s {
+    // The next flat in the list.
+    struct flat_s *next;
+    // The texture data, stored in rows.
+    uint8_t data[64 * 8];
+} flat_t;
+
 typedef struct {
     // The first vertex of this wall.
     vector_t *v1;
@@ -50,6 +58,8 @@ typedef struct sector_t {
     uint16_t num_walls;
     // The walls in this sector.
     wall_t *walls;
+    // The flat used for this sector's floor.
+    flat_t *floor;
 } sector_t;
 
 typedef struct {
@@ -67,6 +77,8 @@ typedef struct {
     size_t numwalls;
     // The linked list of patches in this map.
     patch_t *patches;
+    // The flat used in this map.
+    flat_t *flats;
 } map_t;
 
 // Test if a point is inside a sector.
