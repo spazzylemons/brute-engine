@@ -32,6 +32,8 @@ typedef struct PACKED {
     // Sector that this wall is a portal to. If the portal sector ID is the same as the sector ID
     // that this wall is in, then it is not a portal.
     uint16_t portal;
+    // The texture X offset.
+    uint8_t xoffset;
 } file_wall_t;
 
 static void *ReadMapFile(const char *name, const char *file, size_t *szp, size_t mbsz) {
@@ -76,6 +78,10 @@ static void LoadWalls(const char *name, map_t *map) {
         // Store the portal index directly into the portal pointer. The sector
         // conversion routine will finish the conversion.
         wall->portal = (void *) (uintptr_t) fwall->portal;
+        // Store the wall patch.
+        wall->patch = map->patches;
+        // Store the wall's offsets.
+        wall->xoffset = fwall->xoffset;
     }
     // Free file data.
     Deallocate(fwalls);
@@ -125,6 +131,8 @@ static void LoadSectors(const char *name, map_t *map) {
             wall->normal.x = wall->delta.y;
             wall->normal.y = -wall->delta.x;
             U_VecNormalize(&wall->normal);
+            // Precalculate length.
+            wall->length = sqrtf(U_VecLenSq(&wall->delta));
             // Check for bounding box.
             AABBExpandToFit(&sector->bounds, wall->v1);
             // Wall portal index must be within bounds.
@@ -146,9 +154,57 @@ static void LoadSectors(const char *name, map_t *map) {
     Deallocate(fscts);
 }
 
+// Load a patch from a bitmap.
+static patch_t *LoadPatch(const char *path) {
+    // Load the bitmap.
+    const char *err = NULL;
+    LCDBitmap *bitmap = playdate->graphics->loadBitmap(path, &err);
+    if (bitmap == NULL) {
+        Error("M_Load: Failed to load patch '%s': %s", path, err);
+    }
+    // Get the texture dimensions, checking bounds.
+    int width, height, rowbytes;
+    uint8_t *mask, *data;
+    playdate->graphics->getBitmapData(bitmap, &width, &height, &rowbytes, &mask, &data);
+    if (width > UINT16_MAX || height > UINT16_MAX) {
+        Error("M_Load: Patch '%s' too big", path);
+    }
+    // Enforce a power of two - this makes texture mapping faster.
+    if ((width & (width - 1)) || (height & (height - 1))) {
+        Error("M_Load: Patch '%s' must have power-of-two dimensions", path);
+    }
+    // Allocate patch.
+    uint16_t stride = (height + 7) >> 3;
+    size_t datasize = stride * width;
+    patch_t *patch = Allocate(sizeof(patch_t) + datasize);
+    patch->next = NULL;
+    patch->width = width;
+    patch->height = height;
+    patch->stride = stride;
+    // Convert to columns.
+    memset(&patch->data[0], 0, datasize);
+    for (size_t x = 0; x < width; x++) {
+        uint8_t xmask = 1 << (7 - (x & 7));
+        size_t xindex = x >> 3;
+        for (size_t y = 0; y < height; y++) {
+            if (data[(y * rowbytes) + xindex] & xmask) {
+                uint8_t mask = 1 << (7 - (y & 7));
+                size_t index = y >> 3;
+                patch->data[(x * stride) + index] |= mask;
+            }
+        }
+    }
+    // Free the bitmap.
+    playdate->graphics->freeBitmap(bitmap);
+    // Return the new patch.
+    return patch;
+}
+
 map_t *M_Load(const char *name) {
     // Allocate map.
     map_t *map = Allocate(sizeof(map_t));
+    // Load the texture.
+    map->patches = LoadPatch("textures/wall");
     // Load each part of the map.
     LoadVertices(name, map);
     LoadWalls(name, map);
@@ -160,6 +216,7 @@ void M_Free(map_t *map) {
     Deallocate(map->vtxs);
     Deallocate(map->walls);
     Deallocate(map->scts);
+    Deallocate(map->patches);
     Deallocate(map);
 }
 

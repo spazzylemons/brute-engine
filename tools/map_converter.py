@@ -114,11 +114,14 @@ for linedef in mapdata['linedef']:
     if 'twosided' in linedef:
         front_sector = mapdata['sidedef'][linedef['sidefront']]['sector']
         back_sector = mapdata['sidedef'][linedef['sideback']]['sector']
-        walls[front_sector].append((linedef['v1'], linedef['v2'], back_sector))
-        walls[back_sector].append((linedef['v2'], linedef['v1'], front_sector))
+        front_xoffset = mapdata['sidedef'][linedef['sidefront']].get('offsetx', 0)
+        back_xoffset = mapdata['sidedef'][linedef['sideback']].get('offsetx', 0)
+        walls[front_sector].append((linedef['v1'], linedef['v2'], back_sector, front_xoffset))
+        walls[back_sector].append((linedef['v2'], linedef['v1'], front_sector, back_xoffset))
     else:
         front_sector = mapdata['sidedef'][linedef['sidefront']]['sector']
-        walls[front_sector].append((linedef['v1'], linedef['v2'], front_sector))
+        front_xoffset = mapdata['sidedef'][linedef['sidefront']].get('offsetx', 0)
+        walls[front_sector].append((linedef['v1'], linedef['v2'], front_sector, front_xoffset))
 # Fix each wall set so its lines are in order.
 for i, wall_set in enumerate(walls):
     new_wall_set = [wall_set[0]]
@@ -133,7 +136,7 @@ for wall_set in walls:
     out_sectors.extend(struct.pack('<HH', len(wall_set), wall_index))
     for i, wall in enumerate(wall_set):
         assert wall[1] == wall_set[(i+1)%len(wall_set)][0]
-        out_walls.extend(struct.pack('<HH', wall[0], wall[2]))
+        out_walls.extend(struct.pack('<HHB', wall[0], wall[2], wall[3]))
         wall_index += 1
 # If uncommented, outputs a list of Desmos equations to plot the map.
 # for wall_set in walls:

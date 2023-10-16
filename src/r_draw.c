@@ -52,12 +52,58 @@ static const uint8_t shades[17][4] = {
     DitherPattern(0xf, 0xf, 0xf, 0xf),
 };
 
+// Stride of rows in framebuffer.
+#define ROWSTRIDE 52
+
+// Draw a column.
+static void DrawColumn(
+    // Framebuffer row to draw to.
+    uint8_t *framebuffer,
+    // Column of patch to draw.
+    const uint8_t *source,
+    // Height of column patch.
+    int32_t scale,
+    // The top Y coordinate.
+    int32_t y1,
+    // The bottom Y coordinate.
+    int32_t y2,
+    // The X mask.
+    uint8_t xmask
+) {
+    // Convert scale to mask.
+    scale -= 1;
+    int32_t den = y2 - y1;
+    int32_t offset = y1;
+    if (y1 < 0) y1 = 0;
+    if (y2 > 240) y2 = 240;
+    framebuffer += ROWSTRIDE * y1;
+    // For speed, calculate fixed-point accumulator instead of repeated multiply and divide.
+    int32_t fracstep = (scale << 16) / den;
+    int32_t frac = ((scale * (y1 - offset)) << 16) / den;
+    y2 -= y1;
+    while (y2-- > 0) {
+        int32_t whichy = (frac >> 16) & scale;
+        int32_t ymask = 1 << (7 - (whichy & 7));
+        int32_t yindex = whichy >> 3;
+        if (source[yindex] & ymask) {
+            *framebuffer |= xmask;
+        }
+        frac += fracstep;
+        framebuffer += ROWSTRIDE;
+    }
+}
+
 static void DrawWallColumns(
     uint8_t *framebuffer,
+    const patch_t *patch,
     int32_t x1,
     int32_t y1,
     int32_t x2,
-    int32_t y2
+    int32_t y2,
+    float ua,
+    float ub,
+    float za,
+    float zb
 ) {
     // Sort byi X position for easier clipping.
     if (x1 > x2) {
@@ -84,29 +130,28 @@ static void DrawWallColumns(
     uint8_t mask1 = 1 << (7 - (x1 & 7));
     int32_t den = x2 - x1;
     int32_t num = y2 - y1;
-    for (int32_t x = x1; x < x2; x++) {
-        // int mask = 1 << (x & 7);
-        int32_t y = y1 + ((x - x1) * num) / den;
-        // Figure out temporary shade of column.
-        int shade = y >> 3;
-        if (shade < 0) {
-            shade = 0;
-        } else if (shade > 16) {
-            shade = 16;
-        }
-        int ay1 = 120 - y;
-        int ay2 = 120 + y;
-        if (ay1 < 0) {
-            ay1 = 0;
-        }
-        if (ay2 > 239) {
-            ay2 = 239;
-        }
-        uint8_t *col = &buf[52 * ay1];
-        for (y = ay1; y <= ay2; y++) {
-            *col |= mask1 & shades[shade][y & 3];
-            col += 52;
-        }
+    x2 -= x1;
+    int32_t ua1 = floorf(ua * 256.0f);
+    int32_t ub1 = floorf(ub * 256.0f);
+    int32_t za1 = floorf(za);
+    int32_t zb1 = floorf(zb);
+    int32_t du = ub1 - ua1;
+    int32_t dz = zb1 - za1;
+    for (int32_t x = 0; x < x2; x++) {
+        int32_t num1 = du * (za1 * x);
+        int32_t den1 = (zb1 * x2) - x * dz;
+        int32_t whichx = ((ua1 + (num1 / den1)) >> 8) & (patch->width - 1);
+        int32_t y = y1 + (x * num) / den;
+        int32_t ay1 = 120 - y;
+        int32_t ay2 = 120 + y;
+        DrawColumn(
+            buf,
+            &patch->data[whichx * patch->stride],
+            patch->height,
+            ay1,
+            ay2,
+            mask1
+        );
         mask1 >>= 1;
         if (mask1 == 0) {
             ++buf;
@@ -131,6 +176,9 @@ static bool DrawWall(
     U_VecSub(&b, pos);
     NewRotatePoint(&a, ang);
     NewRotatePoint(&b, ang);
+    // Find UVs of this wall.
+    float ua = wall->xoffset;
+    float ub = ua + wall->length;
     // TODO clean up this code.
     vector_t d;
     U_VecCopy(&d, &b);
@@ -155,11 +203,14 @@ static bool DrawWall(
     float pay = a.y + ta * d.y;
     float pbx = a.x + tb * d.x;
     float pby = a.y + tb * d.y;
+    float pua = ua + ta * (ub - ua);
+    float pub = ua + tb * (ub - ua);
     if (var1 > caa) {
         if (var1 > cba) {
             a.x = pbx;
             a.y = pby;
             nca = cb;
+            ua = pub;
         } else {
             nca = var1 / nay;
         }
@@ -167,6 +218,7 @@ static bool DrawWall(
         a.x = pax;
         a.y = pay;
         nca = ca;
+        ua = pua;
     }
     if (a.y < 0.0f) {
         return false;
@@ -176,6 +228,7 @@ static bool DrawWall(
             b.x = pax;
             b.y = pay;
             ncb = ca;
+            ub = pua;
         } else {
             ncb = var2 / nby;
         }
@@ -183,6 +236,7 @@ static bool DrawWall(
         b.x = pbx;
         b.y = pby;
         ncb = cb;
+        ub = pub;
     }
     if (nca > ncb) {
         float temp = nca;
@@ -208,7 +262,7 @@ static bool DrawWall(
     int32_t ayi = floorf((SCRNDIST * 32.0f) / a.y);
     int32_t byi = floorf((SCRNDIST * 32.0f) / b.y);
     // Draw columns.
-    DrawWallColumns(framebuffer, axi, ayi, bxi, byi);
+    DrawWallColumns(framebuffer, wall->patch, axi, ayi, bxi, byi, ua, ub, a.y, b.y);
     return false;
 }
 
