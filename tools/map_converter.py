@@ -132,8 +132,13 @@ for i, wall_set in enumerate(walls):
 out_walls = bytearray()
 out_sectors = bytearray()
 wall_index = 0
-for wall_set in walls:
-    out_sectors.extend(struct.pack('<HH', len(wall_set), wall_index))
+for j, wall_set in enumerate(walls):
+    out_sectors.extend(struct.pack('<HHHH',
+        len(wall_set),
+        wall_index,
+        mapdata['sector'][j].get('heightfloor', 0),
+        mapdata['sector'][j].get('heightceiling', 128),
+    ))
     for i, wall in enumerate(wall_set):
         assert wall[1] == wall_set[(i+1)%len(wall_set)][0]
         out_walls.extend(struct.pack('<HHB', wall[0], wall[2], wall[3]))

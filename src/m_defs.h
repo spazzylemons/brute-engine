@@ -42,24 +42,28 @@ typedef struct {
     // Texture X offset.
     float xoffset;
     // The sector this wall is a portal to, or NULL if solid.
-    struct sector_t *portal;
+    struct sector_s *portal;
     // The patch used for this wall.
     patch_t *patch;
 } wall_t;
 
-typedef struct sector_t {
+typedef struct sector_s {
     // The next sector in the multipurpose set.
-    struct sector_t *next_seen;
+    struct sector_s *next_seen;
     // The next sector in the multipurpose queue.
-    struct sector_t *next_queue;
+    struct sector_s *next_queue;
     // The bounding box of this sector.
     aabb_t bounds;
     // The number of walls in this sector.
     uint16_t num_walls;
     // The walls in this sector.
     wall_t *walls;
+    // The floor height.
+    int16_t floor;
+    // The ceiling height.
+    int16_t ceiling;
     // The flat used for this sector's floor.
-    flat_t *floor;
+    flat_t *floorflat;
 } sector_t;
 
 typedef struct {

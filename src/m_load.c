@@ -22,6 +22,10 @@ typedef struct PACKED {
     uint16_t num_walls;
     // The first wall index.
     uint16_t first_wall;
+    // The floor height.
+    int16_t floor;
+    // The ceiling height.
+    int16_t ceiling;
 } file_sector_t;
 
 // Format of a wall used in file.
@@ -103,6 +107,11 @@ static void LoadSectors(const char *name, map_t *map) {
         if (fsector->num_walls < 3) {
             Error("M_Load: Sector %d is not a polygon", i);
         }
+        if (fsector->ceiling <= fsector->floor) {
+            Error("M_Load: Sector %d has non-positive vertical space", i);
+        }
+        sector->floor = fsector->floor;
+        sector->ceiling = fsector->ceiling;
         // Check that the wall slice is in bounds.
         size_t wstart = fsector->first_wall;
         size_t wend = wstart + fsector->num_walls;
@@ -150,7 +159,7 @@ static void LoadSectors(const char *name, map_t *map) {
         sector->next_seen = NULL;
         sector->next_queue = NULL;
         // Set flats.
-        sector->floor = map->flats;
+        sector->floorflat = map->flats;
     }
     // Free file data.
     Deallocate(fscts);
