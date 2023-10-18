@@ -44,7 +44,7 @@ static int32_t uvleft;
 // Right UV X coordinate.
 static int32_t uvright;
 // Eye height to render at.
-static float rendereyeheight;
+static int32_t rendereyeheight;
 
 // Enum for how to clip sector bounds.
 typedef enum {
@@ -53,8 +53,19 @@ typedef enum {
     CLIP_FLOOR, // Clip the floor Y bounds.
 } cliptype_t;
 
+// Buffer for storing Y pixel coordinate of portal top.
 static uint8_t renderminy[LCD_COLUMNS];
+// Buffer for storing Y pixel coordinate of portal bottom.
 static uint8_t rendermaxy[LCD_COLUMNS];
+// Buffer for storing previous Y pixel top, for flat drawing.
+static uint8_t prevminy[LCD_COLUMNS];
+// Buffer for storing previous Y pixel bottom, for flat drawing.
+static uint8_t prevmaxy[LCD_COLUMNS];
+
+static uint16_t flatleft[LCD_ROWS];
+static uint16_t flatright[LCD_ROWS];
+static uint8_t flattop;
+static uint8_t flatbottom;
 
 // static uint8_t *const clipbounds[] = {
 //     [CLIP_NONE] = NULL,
@@ -73,11 +84,17 @@ static void TryClip(cliptype_t cliptype, int32_t val, int32_t x) {
         case CLIP_NONE:
             break;
         case CLIP_CEIL:
+            if (val > rendermaxy[x]) {
+                val = rendermaxy[x];
+            }
             if (val > renderminy[x]) {
                 renderminy[x] = val;
             }
             break;
         case CLIP_FLOOR:
+            if (val < renderminy[x]) {
+                val = renderminy[x];
+            }
             if (val < rendermaxy[x]) {
                 rendermaxy[x] = val;
             }
@@ -124,33 +141,76 @@ static const uint8_t shades[17][4] = {
 // Stride of rows in framebuffer.
 #define ROWSTRIDE 52
 
-// Draw a floor.
-static void DrawFlat(int32_t x, int32_t y, int32_t endy, int height, int32_t offscale) {
-    if (y < renderminy[x]) y = renderminy[x];
-    if (endy > rendermaxy[x]) endy = rendermaxy[x];
-    // Get location in framebuffer to draw to.
-    uint8_t *framebuffer = rendercol + (ROWSTRIDE * y);
-    int32_t offx = floorf(renderpos.x * 256.0f) * offscale;
-    int32_t offy = floorf(renderpos.y * 256.0f) * -offscale;
-    int32_t uvx = (SCRNDISTI - x) << 8;
-    int32_t uvy = SCRNDISTI << 8;
-    int32_t foox = height * (uvx * flatcosine - uvy * flatsine);
-    int32_t fooy = height * (uvx * flatsine + uvy * flatcosine);
-    for (; y < endy; y++) {
-        int32_t den = (y - 120) * SCRNDISTI;
-        if (den != 0) {
-            uint16_t newx = ((foox / den + offx) >> 8) & 63;
-            uint16_t newy = ((fooy / den + offy) >> 8) & 63;
-            uint8_t flatmask = 1 << (7 - (newx & 7));
-            uint16_t flatindex = (newx >> 3) + (newy * 8);
-            if (rendersector->floorflat->data[flatindex] & flatmask) {
-                *framebuffer |= renderxmask;
-            } else {
-                *framebuffer &= ~renderxmask;
+// Get the min and max X bounds.
+static void FindXBounds(const uint8_t *miny, const uint8_t *maxy) {
+    // Where are the min and max Y coordinates?
+    flattop = LCD_ROWS;
+    flatbottom = 0;
+    for (uint16_t x = renderxmin; x < renderxmax; x++) {
+        if (miny[x] < flattop) flattop = miny[x];
+        if (maxy[x] > flatbottom) flatbottom = maxy[x];
+    }
+    // Go through these rows and find the bounds.
+    for (uint8_t y = flattop; y < flatbottom; y++) {
+        int32_t x;
+        for (x = renderxmin; x < renderxmax; x++) {
+            if (y >= miny[x] && y < maxy[x]) {
+                break;
             }
         }
-        framebuffer += ROWSTRIDE;
+        flatleft[y] = x;
+        for (x = renderxmax - 1; x >= renderxmin; x--) {
+            if (y >= miny[x] && y < maxy[x]) {
+                break;
+            }
+        }
+        flatright[y] = x + 1;
     }
+}
+
+// Draw a floor or ceiling.
+static void NewDrawFlat(const uint8_t *miny, const uint8_t *maxy, int32_t height) {
+    FindXBounds(miny, maxy);
+    int32_t offx = floorf(renderpos.x * 256.0f);
+    int32_t offy = floorf(renderpos.y * 256.0f);
+    int32_t heightcos = height * flatcosine;
+    int32_t heightsin = height * flatsine;
+    for (int32_t y = flattop; y < flatbottom; y++) {
+        int32_t den = y - 120;
+        // To be careful, don't draw if we'd divide by zero.
+        if (den != 0) {
+            uint16_t startx = flatleft[y];
+            uint8_t *framebuffer = renderbuf + (ROWSTRIDE * y) + (startx >> 3);
+            uint8_t mask = 1 << (7 - (startx & 7));
+            int32_t fracstepx = -heightcos / (den * SCRNDISTI);
+            int32_t fracstepy = -heightsin / (den * SCRNDISTI);
+            int32_t fracx = (fracstepx * startx + ((heightcos - heightsin) / den) - offx);
+            int32_t fracy = (fracstepy * startx + ((heightsin + heightcos) / den) + offy);
+            for (uint16_t x = startx; x < flatright[y]; x++) {
+                uint16_t newx = (fracx >> 8) & 63;
+                uint16_t newy = (fracy >> 8) & 63;
+                uint8_t flatmask = 1 << (7 - (newx & 7));
+                uint16_t flatindex = (newx >> 3) + (newy << 3);
+                if (rendersector->floorflat->data[flatindex] & flatmask) {
+                    *framebuffer |= mask;
+                } else {
+                    *framebuffer &= ~mask;
+                }
+                fracx += fracstepx;
+                fracy += fracstepy;
+                mask >>= 1;
+                if (mask == 0) {
+                    mask = 0x80;
+                    ++framebuffer;
+                }
+            }
+        }
+    }
+}
+
+static void DrawFlats(void) {
+    NewDrawFlat(prevminy, renderminy, heightceiling);
+    NewDrawFlat(rendermaxy, prevmaxy, heightfloor);
 }
 
 // Draw a column.
@@ -195,7 +255,6 @@ static void DrawColumn(
 
 static void DrawWallColumns(
     bool drawwall,
-    bool drawflat,
     cliptype_t ceilclip,
     cliptype_t floorclip
 ) {
@@ -233,10 +292,8 @@ static void DrawWallColumns(
                 ay2
             );
         }
-        if (drawflat) {
-            DrawFlat(x + x1, 0, ay1, heightceiling, -1);
-            DrawFlat(x + x1, ay2, 240, heightfloor, -1);
-        }
+        prevminy[x + x1] = renderminy[x + x1];
+        prevmaxy[x + x1] = rendermaxy[x + x1];
         TryClip(ceilclip, ay1, x + x1);
         TryClip(floorclip, ay2, x + x1);
         renderxmask >>= 1;
@@ -362,25 +419,27 @@ static bool DrawWall(float *left, float *right) {
         *left = nca;
         *right = ncb;
 
-        DrawWallColumns(false, true, CLIP_CEIL, CLIP_FLOOR);
+        DrawWallColumns(false, CLIP_CEIL, CLIP_FLOOR);
+        DrawFlats();
 
         // If the height of the ceiling goes down, render top wall.
         if (renderwall->portal->ceiling < rendersector->ceiling) {
             heightceiling = rendereyeheight - rendersector->ceiling;
             heightfloor = rendereyeheight - renderwall->portal->ceiling;
-            DrawWallColumns(true, false, CLIP_NONE, CLIP_CEIL);
+            DrawWallColumns(true, CLIP_NONE, CLIP_CEIL);
         }
 
         // If the height of the floor goes up, render bottom wall.
         if (renderwall->portal->floor > rendersector->floor) {
             heightceiling = rendereyeheight - renderwall->portal->floor;
             heightfloor = rendereyeheight - rendersector->floor;
-            DrawWallColumns(true, false, CLIP_FLOOR, CLIP_NONE);
+            DrawWallColumns(true, CLIP_FLOOR, CLIP_NONE);
         }
 
         return true;
     } else {
-        DrawWallColumns(true, true, CLIP_NONE, CLIP_NONE);
+        DrawWallColumns(true, CLIP_CEIL, CLIP_FLOOR);
+        DrawFlats();
         return false;
     }
 }
@@ -410,12 +469,14 @@ void R_DrawSector(sector_t *sector, const vector_t *pos, float ang, float eyehei
     renderangle = ang;
     wallsine = sinf(-renderangle);
     wallcosine = cosf(-renderangle);
-    flatsine = floorf(wallsine * SCRNDIST);
-    flatcosine = floorf(wallcosine * SCRNDIST);
+    flatsine = (int32_t) floorf(wallsine * SCRNDIST) << 8;
+    flatcosine = (int32_t) floorf(wallcosine * SCRNDIST) << 8;
     renderbuf = playdate->graphics->getFrame();
     memset(renderminy, 0, sizeof(renderminy));
     memset(rendermaxy, LCD_ROWS, sizeof(rendermaxy));
-    rendereyeheight = eyeheight;
+    memset(prevminy, 0, sizeof(prevminy));
+    memset(prevmaxy, LCD_ROWS, sizeof(prevmaxy));
+    rendereyeheight = floorf(eyeheight);
     // Run recursive sector drawing.
     DrawSectorRecursive(sector, -200.0f, 200.0f);
     // Notify the system that we've drawn over the framebuffer.
