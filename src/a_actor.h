@@ -23,6 +23,8 @@ typedef struct {
     vector_t pos;
     // The actor's rotation.
     float angle;
+    // The actor's vertical position.
+    float zpos;
     // The sector the actor was last seen in.
     sector_t *sector;
     // The actor's class.
@@ -52,6 +54,7 @@ actor_t *A_ActorSpawn(
     const actorclass_t *class,
     const vector_t *pos,
     float angle,
+    float zpos,
     sector_t *sector
 );
 

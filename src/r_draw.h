@@ -4,6 +4,6 @@
 #include "m_defs.h"
 
 // Draw a sector at the given position and angle.
-void R_DrawSector(sector_t *sector, const vector_t *pos, float ang);
+void R_DrawSector(sector_t *sector, const vector_t *pos, float ang, float eyeheight);
 
 #endif

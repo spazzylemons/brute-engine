@@ -29,7 +29,7 @@ static int update(void *userdata) {
         DisplayError();
     } else {
         player->class->update(player);
-        R_DrawSector(player->sector, &player->pos, player->angle);
+        R_DrawSector(player->sector, &player->pos, player->angle, player->zpos + 32.0f);
         playdate->system->drawFPS(0, 0);
     }
 
@@ -53,7 +53,7 @@ int eventHandler(PlaydateAPI *pd, PDSystemEvent event, uint32_t arg) {
             vector_t pos;
             pos.x = 0.0f;
             pos.y = 0.0f;
-            player = A_ActorSpawn(&A_ClassPlayer, &pos, 0.0f, &map->scts[0]);
+            player = A_ActorSpawn(&A_ClassPlayer, &pos, 0.0f, 0.0f, &map->scts[0]);
         }
     }
     

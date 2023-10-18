@@ -35,6 +35,7 @@ actor_t *A_ActorSpawn(
     const actorclass_t *class,
     const vector_t *pos,
     float angle,
+    float zpos,
     sector_t *sector
 ) {
     // Allocate actor.
@@ -46,6 +47,7 @@ actor_t *A_ActorSpawn(
     // Fill in fields.
     U_VecCopy(&actor->pos, pos);
     actor->angle = angle;
+    actor->zpos = zpos;
     actor->sector = sector;
     actor->class = class;
     // Initialize actor.

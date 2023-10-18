@@ -27,7 +27,11 @@ static void Update(actor_t *this) {
     }
 
     if (held & kButtonA) {
-        Error("this is a test! %d", 123);
+        this->zpos += 1.0f;
+    }
+
+    if (held & kButtonB) {
+        this->zpos -= 1.0f;
     }
 
     this->sector = M_MoveAndSlide(this->sector, &this->pos, &delta);
