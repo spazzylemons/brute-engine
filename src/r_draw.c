@@ -41,6 +41,10 @@ static int32_t heightfloor;
 static int32_t distleft;
 // Distance of right side of wall.
 static int32_t distright;
+// Left UV X coordinate.
+static int32_t uvleft;
+// Right UV X coordinate.
+static int32_t uvright;
 
 // Bitmask of written pixels. While we want to minimize overdraw for speed, it
 // could happen due to rounding error, or some parts may not yet support no overdraw.
@@ -162,14 +166,7 @@ static void DrawColumn(
     }
 }
 
-static void DrawWallColumns(
-    bool drawwall,
-    bool drawflat,
-    float ua,
-    float ub,
-    float za,
-    float zb
-) {
+static void DrawWallColumns(bool drawwall, bool drawflat) {
     int32_t x1 = renderxmin;
     int32_t x2 = renderxmax;
     int32_t y1h = (SCRNDISTI * heightceiling) / distleft;
@@ -184,21 +181,13 @@ static void DrawWallColumns(
     int32_t numh = y2h - y1h;
     int32_t numl = y2l - y1l;
     x2 -= x1;
-    int32_t ua1 = floorf(ua * 4.0f);
-    int32_t ub1 = floorf(ub * 4.0f);
-    int32_t za1 = floorf(za);
-    int32_t zb1 = floorf(zb);
-    if (zb1 == 0) {
-        // We'll divide by zero if we let this wall render.
-        return;
-    }
-    int32_t du = ub1 - ua1;
-    int32_t dz = zb1 - za1;
+    int32_t du = uvright - uvleft;
+    int32_t dz = distright - distleft;
     const patch_t *patch = renderwall->patch;
     for (int32_t x = 0; x < x2; x++) {
-        int32_t num1 = du * (za1 * x);
-        int32_t den1 = (zb1 * x2) - x * dz;
-        int32_t whichx = ((ua1 + (num1 / den1)) >> 2) & (patch->width - 1);
+        int32_t num1 = du * (distleft * x);
+        int32_t den1 = (distright * x2) - x * dz;
+        int32_t whichx = ((uvleft + (num1 / den1)) >> 2) & (patch->width - 1);
         int32_t yh = y1h + (x * numh) / den;
         int32_t yl = y1l + (x * numl) / den;
         int32_t ay1 = yh + 120;
@@ -333,28 +322,31 @@ static bool DrawWall(float *left, float *right) {
     heightceiling = EYELEVEL - rendersector->ceiling;
     heightfloor = EYELEVEL - rendersector->floor;
 
+    uvleft = floorf(ua * 4.0f);
+    uvright = floorf(ub * 4.0f);
+
     if (renderwall->portal != NULL) {
         *left = nca;
         *right = ncb;
 
-        DrawWallColumns(false, true, ua, ub, a.y, b.y);
+        DrawWallColumns(false, true);
 
         // If the height of the ceiling goes down, render top wall.
         if (renderwall->portal->ceiling < rendersector->ceiling) {
             heightfloor = EYELEVEL - renderwall->portal->ceiling;
-            DrawWallColumns(true, false, ua, ub, a.y, b.y);
+            DrawWallColumns(true, false);
         }
 
         // If the height of the floor goes up, render bottom wall.
         if (renderwall->portal->floor > rendersector->floor) {
             heightceiling = EYELEVEL - renderwall->portal->floor;
             heightfloor = EYELEVEL - rendersector->floor;
-            DrawWallColumns(true, false, ua, ub, a.y, b.y);
+            DrawWallColumns(true, false);
         }
 
         return true;
     } else {
-        DrawWallColumns(true, true, ua, ub, a.y, b.y);
+        DrawWallColumns(true, true);
         return false;
     }
 }
