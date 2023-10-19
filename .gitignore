@@ -3,4 +3,6 @@
 /*.pdx
 /Source/pdex.*
 /Source/maps
+/Source/flats
+/Source/patches
 /maps/*.wad.bak

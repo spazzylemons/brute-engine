@@ -12,10 +12,8 @@ typedef struct patch_s {
     struct patch_s *next;
     // The width of the texture.
     uint16_t width;
-    // The height of the texture.
+    // The height of the texture. Stride is height.
     uint16_t height;
-    // The number of bytes per column.
-    uint16_t stride;
     // The texture data, stored in columns.
     uint8_t data[0];
 } patch_t;
@@ -25,7 +23,7 @@ typedef struct flat_s {
     // The next flat in the list.
     struct flat_s *next;
     // The texture data, stored in rows.
-    uint8_t data[64 * 8];
+    uint8_t data[64 * 64];
 } flat_t;
 
 typedef struct {

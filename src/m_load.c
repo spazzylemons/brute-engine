@@ -8,6 +8,14 @@
 // Just in case, we'll pack the structs we read from the files.
 #define PACKED __attribute__((__packed__))
 
+// Format of patch used in file.
+typedef struct PACKED {
+    // Packed width and height.
+    uint8_t dimensions;
+    // The patch data, stored in columns.
+    uint8_t data[0];
+} file_patch_t;
+
 // Format of vertex used in file.
 typedef struct PACKED {
     // The X coordinate of the vertex.
@@ -167,71 +175,48 @@ static void LoadSectors(const char *name, map_t *map) {
 
 // Load a flat from a bitmap.
 static flat_t *LoadFlat(const char *path) {
-    // Load the bitmap.
-    const char *err = NULL;
-    LCDBitmap *bitmap = playdate->graphics->loadBitmap(path, &err);
-    if (bitmap == NULL) {
-        Error("M_Load: Failed to load flat '%s': %s", path, err);
-    }
-    // Get the texture dimensions, checking bounds.
-    int width, height, rowbytes;
-    uint8_t *mask, *data;
-    playdate->graphics->getBitmapData(bitmap, &width, &height, &rowbytes, &mask, &data);
-    if (width != 64 || height != 64) {
-        Error("M_Load: Flat '%s' is not 64x64", path);
+    size_t size;
+    uint8_t *fflat = U_FileRead(path, &size);
+    if (size < 4096) {
+        Error("M_Load: Flat '%s' is missing data", path);
     }
     // Allocate the flat.
     flat_t *flat = Allocate(sizeof(flat_t));
     flat->next = NULL;
-    memcpy(&flat->data[0], data, sizeof(flat->data));
-    // Free the bitmap.
-    playdate->graphics->freeBitmap(bitmap);
+    memcpy(&flat->data[0], fflat, sizeof(flat->data));
+    // Free file data.
+    Deallocate(fflat);
     // Return the new flat.
     return flat;
 }
 
 // Load a patch from a bitmap.
 static patch_t *LoadPatch(const char *path) {
-    // Load the bitmap.
-    const char *err = NULL;
-    LCDBitmap *bitmap = playdate->graphics->loadBitmap(path, &err);
-    if (bitmap == NULL) {
-        Error("M_Load: Failed to load patch '%s': %s", path, err);
+    size_t size;
+    file_patch_t *fpatch = U_FileRead(path, &size);
+    // Verify the allocation at least has the dimensions.
+    if (size < 1) {
+        Error("M_Load: Patch '%s' missing dimensions", path);
     }
-    // Get the texture dimensions, checking bounds.
-    int width, height, rowbytes;
-    uint8_t *mask, *data;
-    playdate->graphics->getBitmapData(bitmap, &width, &height, &rowbytes, &mask, &data);
-    if (width > UINT16_MAX || height > UINT16_MAX) {
-        Error("M_Load: Patch '%s' too big", path);
+    // Get the dimensions.
+    uint16_t width = 1 << (fpatch->dimensions >> 4);
+    uint16_t height = 1 << (fpatch->dimensions & 15);
+    if (width < 1 || height < 1) {
+        Error("M_Load: Patch '%s' is too small", path);
     }
-    // Enforce a power of two - this makes texture mapping faster.
-    if ((width & (width - 1)) || (height & (height - 1))) {
-        Error("M_Load: Patch '%s' must have power-of-two dimensions", path);
+    // Verify the size is as promised.
+    size_t datasize = height * width;
+    if (size < 1 + datasize) {
+        Error("M_Load: Patch '%s' is missing data", path);
     }
-    // Allocate patch.
-    uint16_t stride = (height + 7) >> 3;
-    size_t datasize = stride * width;
+    // Allocate patch and copy data over.
     patch_t *patch = Allocate(sizeof(patch_t) + datasize);
     patch->next = NULL;
     patch->width = width;
     patch->height = height;
-    patch->stride = stride;
-    // Convert to columns.
-    memset(&patch->data[0], 0, datasize);
-    for (size_t x = 0; x < width; x++) {
-        uint8_t xmask = 1 << (7 - (x & 7));
-        size_t xindex = x >> 3;
-        for (size_t y = 0; y < height; y++) {
-            if (data[(y * rowbytes) + xindex] & xmask) {
-                uint8_t mask = 1 << (7 - (y & 7));
-                size_t index = y >> 3;
-                patch->data[(x * stride) + index] |= mask;
-            }
-        }
-    }
-    // Free the bitmap.
-    playdate->graphics->freeBitmap(bitmap);
+    memcpy(&patch->data[0], &fpatch->data[0], datasize);
+    // Free the file data.
+    Deallocate(fpatch);
     // Return the new patch.
     return patch;
 }
@@ -240,8 +225,8 @@ map_t *M_Load(const char *name) {
     // Allocate map.
     map_t *map = Allocate(sizeof(map_t));
     // Load the textures.
-    map->patches = LoadPatch("textures/wall");
-    map->flats = LoadFlat("textures/floor");
+    map->patches = LoadPatch("patches/wall");
+    map->flats = LoadFlat("flats/floor");
     // Load each part of the map.
     LoadVertices(name, map);
     LoadWalls(name, map);

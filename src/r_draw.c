@@ -118,7 +118,8 @@ static void NewRotatePoint(vector_t *v, float ang) {
 
 #define DitherPattern(a, b, c, d) { a * 0x11, b * 0x11, c * 0x11, d * 0x11 }
 
-static const uint8_t shades[17][4] = {
+static const uint8_t shades[18][4] = {
+    DitherPattern(0x0, 0x0, 0x0, 0x0), // Transparent?
     DitherPattern(0x0, 0x0, 0x0, 0x0),
     DitherPattern(0x8, 0x0, 0x0, 0x0),
     DitherPattern(0x8, 0x0, 0x2, 0x0),
@@ -136,6 +137,8 @@ static const uint8_t shades[17][4] = {
     DitherPattern(0xf, 0x7, 0xf, 0xd),
     DitherPattern(0xf, 0x7, 0xf, 0xf),
     DitherPattern(0xf, 0xf, 0xf, 0xf),
+    // TODO buffer overflow can occur if we have a texture that accesses higher
+    // palette indices. We should check for this.
 };
 
 // Stride of rows in framebuffer.
@@ -189,9 +192,9 @@ static void NewDrawFlat(const uint8_t *miny, const uint8_t *maxy, int32_t height
             for (uint16_t x = startx; x < flatright[y]; x++) {
                 uint16_t newx = (fracx >> 8) & 63;
                 uint16_t newy = (fracy >> 8) & 63;
-                uint8_t flatmask = 1 << (7 - (newx & 7));
-                uint16_t flatindex = (newx >> 3) + (newy << 3);
-                if (rendersector->floorflat->data[flatindex] & flatmask) {
+                uint16_t flatindex = newx + (newy << 6);
+                uint8_t pixel = rendersector->floorflat->data[flatindex];
+                if (shades[pixel][y & 3] & mask) {
                     *framebuffer |= mask;
                 } else {
                     *framebuffer &= ~mask;
@@ -238,12 +241,10 @@ static void DrawColumn(
     int32_t frac = ((height * (y1 - offset)) << 12) / den;
     // Convert scale to mask.
     scale -= 1;
-    y2 -= y1;
-    while (y2-- > 0) {
+    for (int32_t y = y1; y < y2; y++) {
         int32_t whichy = (frac >> 12) & scale;
-        int32_t ymask = 1 << (7 - (whichy & 7));
-        int32_t yindex = whichy >> 3;
-        if (source[yindex] & ymask) {
+        uint16_t pixel = source[whichy];
+        if (shades[pixel][y & 3] & renderxmask) {
             *framebuffer |= renderxmask;
         } else {
             *framebuffer &= ~renderxmask;
@@ -284,7 +285,7 @@ static void DrawWallColumns(
         int32_t ay2 = yl + 120;
         if (drawwall) {
             DrawColumn(
-                &patch->data[whichx * patch->stride],
+                &patch->data[whichx * patch->height],
                 patch->height,
                 heightfloor - heightceiling,
                 x + x1,

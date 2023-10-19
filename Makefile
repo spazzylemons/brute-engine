@@ -14,9 +14,7 @@ $(error SDK path not found; set ENV value PLAYDATE_SDK_PATH)
 endif
 
 # WADs from which map files are derived
-WADFILES = $(wildcard maps/*.wad)
-MAPDIRS = $(patsubst maps/%.wad,Source/maps/%,$(WADFILES))
-MAPFILES = $(MAPDIRS:=/vertices) $(MAPDIRS:=/sectors) $(MAPDIRS:=/walls)
+WADFILE = maps/brute.wad
 
 ######
 # IMPORTANT: You must add your source folders to VPATH for make to find them
@@ -62,11 +60,10 @@ ULIBS =
 
 include $(SDK)/C_API/buildsupport/common.mk
 
-all: $(MAPFILES)
+all: wadextract
 
-Source/maps/%/vertices Source/maps/%/sectors Source/maps/%/walls: maps/%.wad
-	mkdir -p Source/maps/$*
-	tools/map_converter.py $< Source/maps/$*
+wadextract: $(WADFILE)
+	tools/map_converter.py $< Source/
 
 clean: mapclean
 
