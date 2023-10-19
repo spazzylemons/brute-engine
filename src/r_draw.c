@@ -1,6 +1,7 @@
 #include "b_core.h"
 #include "m_iter.h"
 #include "r_draw.h"
+#include "r_drawing.h"
 #include "u_vec.h"
 
 #include <stdbool.h>
@@ -10,11 +11,7 @@ static vector_t renderpos;
 // Render angle.
 static float renderangle;
 // Playdate framebuffer.
-static uint8_t *__attribute__((aligned(4))) renderbuf;
-// Pointer to current column.
-static uint8_t *rendercol;
-// Mask for current column.
-static uint8_t renderxmask;
+uint8_t *__attribute__((aligned(4))) renderbuf;
 // The current sector.
 static const sector_t *rendersector;
 // The current wall.
@@ -116,34 +113,6 @@ static void NewRotatePoint(vector_t *v, float ang) {
 // Eye level above ground.
 #define EYELEVEL 32
 
-#define DitherPattern(a, b, c, d) { a * 0x11, b * 0x11, c * 0x11, d * 0x11 }
-
-static const uint8_t shades[18][4] = {
-    DitherPattern(0x0, 0x0, 0x0, 0x0), // Transparent?
-    DitherPattern(0x0, 0x0, 0x0, 0x0),
-    DitherPattern(0x8, 0x0, 0x0, 0x0),
-    DitherPattern(0x8, 0x0, 0x2, 0x0),
-    DitherPattern(0x8, 0x0, 0xa, 0x0),
-    DitherPattern(0xa, 0x0, 0xa, 0x0),
-    DitherPattern(0xa, 0x0, 0xa, 0x1),
-    DitherPattern(0xa, 0x4, 0xa, 0x1),
-    DitherPattern(0xa, 0x4, 0xa, 0x5),
-    DitherPattern(0xa, 0x5, 0xa, 0x5),
-    DitherPattern(0xd, 0x5, 0xa, 0x5),
-    DitherPattern(0xd, 0x5, 0xe, 0x5),
-    DitherPattern(0xd, 0x5, 0xf, 0x5),
-    DitherPattern(0xf, 0x5, 0xf, 0x5),
-    DitherPattern(0xf, 0x5, 0xf, 0xd),
-    DitherPattern(0xf, 0x7, 0xf, 0xd),
-    DitherPattern(0xf, 0x7, 0xf, 0xf),
-    DitherPattern(0xf, 0xf, 0xf, 0xf),
-    // TODO buffer overflow can occur if we have a texture that accesses higher
-    // palette indices. We should check for this.
-};
-
-// Stride of rows in framebuffer.
-#define ROWSTRIDE 52
-
 // Get the min and max X bounds.
 static void FindXBounds(const uint8_t *miny, const uint8_t *maxy) {
     // Where are the min and max Y coordinates?
@@ -174,39 +143,25 @@ static void FindXBounds(const uint8_t *miny, const uint8_t *maxy) {
 // Draw a floor or ceiling.
 static void NewDrawFlat(const uint8_t *miny, const uint8_t *maxy, int32_t height) {
     FindXBounds(miny, maxy);
-    int32_t offx = floorf(renderpos.x * 256.0f);
-    int32_t offy = floorf(renderpos.y * 256.0f);
+    int32_t offx = floorf((fmodf(renderpos.x, 64.0f) + 64.0f) * 4096.0f);
+    int32_t offy = floorf((fmodf(renderpos.y, 64.0f) + 64.0f) * 4096.0f);
     int32_t heightcos = height * flatcosine;
     int32_t heightsin = height * flatsine;
+    // Set span source.
+    ds_source = rendersector->floorflat->data;
+    // Draw spans.
     for (int32_t y = flattop; y < flatbottom; y++) {
         int32_t den = y - 120;
         // To be careful, don't draw if we'd divide by zero.
         if (den != 0) {
-            uint16_t startx = flatleft[y];
-            uint8_t *framebuffer = renderbuf + (ROWSTRIDE * y) + (startx >> 3);
-            uint8_t mask = 1 << (7 - (startx & 7));
-            int32_t fracstepx = -heightcos / (den * SCRNDISTI);
-            int32_t fracstepy = -heightsin / (den * SCRNDISTI);
-            int32_t fracx = (fracstepx * startx + ((heightcos - heightsin) / den) - offx);
-            int32_t fracy = (fracstepy * startx + ((heightsin + heightcos) / den) + offy);
-            for (uint16_t x = startx; x < flatright[y]; x++) {
-                uint16_t newx = (fracx >> 8) & 63;
-                uint16_t newy = (fracy >> 8) & 63;
-                uint16_t flatindex = newx + (newy << 6);
-                uint8_t pixel = rendersector->floorflat->data[flatindex];
-                if (shades[pixel][y & 3] & mask) {
-                    *framebuffer |= mask;
-                } else {
-                    *framebuffer &= ~mask;
-                }
-                fracx += fracstepx;
-                fracy += fracstepy;
-                mask >>= 1;
-                if (mask == 0) {
-                    mask = 0x80;
-                    ++framebuffer;
-                }
-            }
+            ds_x1 = flatleft[y];
+            ds_x2 = flatright[y];
+            ds_y = y;
+            ds_xstep = -heightcos / (den * SCRNDISTI);
+            ds_ystep = -heightsin / (den * SCRNDISTI);
+            ds_xfrac = (ds_xstep * ds_x1 + ((heightcos - heightsin) / den) - offx);
+            ds_yfrac = (ds_ystep * ds_x1 + ((heightsin + heightcos) / den) + offy);
+            R_DrawSpan();
         }
     }
 }
@@ -231,27 +186,19 @@ static void DrawColumn(
     // The bottom Y coordinate.
     int32_t y2
 ) {
-    int32_t den = y2 - y1;
-    int32_t offset = y1;
+    dc_source = source;
+    dc_height = scale;
+    dc_scale = (height << 12) / (y2 - y1);
+    dc_offset = y1;
+    dc_x = x;
+    // Check bounds.
     if (y1 < renderminy[x]) y1 = renderminy[x];
-    if (y2 > rendermaxy[x]) y2 = rendermaxy[x];
-    uint8_t *framebuffer = rendercol + (ROWSTRIDE * y1);
-    // For speed, calculate fixed-point accumulator instead of repeated multiply and divide.
-    int32_t fracstep = (height << 12) / den;
-    int32_t frac = ((height * (y1 - offset)) << 12) / den;
-    // Convert scale to mask.
-    scale -= 1;
-    for (int32_t y = y1; y < y2; y++) {
-        int32_t whichy = (frac >> 12) & scale;
-        uint16_t pixel = source[whichy];
-        if (shades[pixel][y & 3] & renderxmask) {
-            *framebuffer |= renderxmask;
-        } else {
-            *framebuffer &= ~renderxmask;
-        }
-        frac = (frac + fracstep) & ((scale << 12) | 0xfff);
-        framebuffer += ROWSTRIDE;
-    }
+    else if (y1 > rendermaxy[x]) y1 = rendermaxy[x];
+    if (y2 < renderminy[x]) y2 = renderminy[x];
+    else if (y2 > rendermaxy[x]) y2 = rendermaxy[x];
+    dc_yh = y1;
+    dc_yl = y2;
+    R_DrawColumn();
 }
 
 static void DrawWallColumns(
@@ -266,8 +213,6 @@ static void DrawWallColumns(
     int32_t y1l = (SCRNDISTI * heightfloor) / distleft;
     int32_t y2l = (SCRNDISTI * heightfloor) / distright;
     // Draw columns.
-    rendercol = &renderbuf[x1 >> 3];
-    renderxmask = 1 << (7 - (x1 & 7));
     int32_t den = x2 - x1;
     int32_t numh = y2h - y1h;
     int32_t numl = y2l - y1l;
@@ -297,11 +242,6 @@ static void DrawWallColumns(
         prevmaxy[x + x1] = rendermaxy[x + x1];
         TryClip(ceilclip, ay1, x + x1);
         TryClip(floorclip, ay2, x + x1);
-        renderxmask >>= 1;
-        if (renderxmask == 0) {
-            ++rendercol;
-            renderxmask = 0x80;
-        }
     }
 }
 
@@ -470,8 +410,8 @@ void R_DrawSector(sector_t *sector, const vector_t *pos, float ang, float eyehei
     renderangle = ang;
     wallsine = sinf(-renderangle);
     wallcosine = cosf(-renderangle);
-    flatsine = (int32_t) floorf(wallsine * SCRNDIST) << 8;
-    flatcosine = (int32_t) floorf(wallcosine * SCRNDIST) << 8;
+    flatsine = (int32_t) floorf(wallsine * SCRNDIST) << 12;
+    flatcosine = (int32_t) floorf(wallcosine * SCRNDIST) << 12;
     renderbuf = playdate->graphics->getFrame();
     memset(renderminy, 0, sizeof(renderminy));
     memset(rendermaxy, LCD_ROWS, sizeof(rendermaxy));

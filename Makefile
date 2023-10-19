@@ -33,6 +33,7 @@ SRC = \
 	src/m_load.c \
 	src/m_map.c \
 	src/r_draw.c \
+	src/r_drawing.c \
 	src/u_aabb.c \
 	src/u_error.c \
 	src/u_file.c \

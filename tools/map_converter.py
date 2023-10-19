@@ -143,7 +143,7 @@ def handle_udmf(content, mapname):
     #         print(r'\right)', end='')
     #     print(r'\right)')
     # Commit to files.
-    mappath = sys.argv[2] + '/maps/' + mapname
+    mappath = sys.argv[2] + '/maps/' + mapname.lower()
     os.makedirs(mappath, exist_ok=True)
     with open(mappath + '/vertices', 'wb') as file:
         file.write(out_vertices)
