@@ -7,7 +7,7 @@
 #include "a_classes.h"
 #include "m_load.h"
 #include "m_map.h"
-#include "r_draw.h"
+#include "r_main.h"
 #include "u_error.h"
 
 PlaydateAPI *playdate;
@@ -29,7 +29,7 @@ static int update(void *userdata) {
         DisplayError();
     } else {
         player->class->update(player);
-        R_DrawSector(player->sector, &player->pos, player->angle, player->zpos + 32.0f);
+        R_RenderViewpoint(player);
         playdate->system->drawFPS(0, 0);
     }
 
