@@ -29,6 +29,7 @@ SRC = \
 	src/a_player.c \
 	src/b_core.c \
 	src/b_main.c \
+	src/i_main.c \
 	src/m_iter.c \
 	src/m_load.c \
 	src/m_map.c \

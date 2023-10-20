@@ -1,61 +1,21 @@
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "pd_api.h"
-
 #include "a_classes.h"
+#include "b_core.h"
 #include "m_load.h"
-#include "m_map.h"
 #include "r_main.h"
-#include "u_error.h"
-
-PlaydateAPI *playdate;
 
 static map_t *map = NULL;
 static actor_t *player = NULL;
 
-static bool haderror = false;
-
-static int update(void *userdata) {
-    (void) userdata;
-
-    if (haderror) {
-        return 0;
-    }
-
-    if (CatchError()) {
-        haderror = true;
-        DisplayError();
-    } else {
-        A_ActorUpdate();
-        R_RenderViewpoint(player);
-        playdate->system->drawFPS(0, 0);
-    }
-
-    return 1;
+void B_MainInit(void) {
+    map = M_Load("map01");
+    vector_t pos;
+    pos.x = 0.0f;
+    pos.y = 0.0f;
+    player = A_ActorSpawn(&A_ClassPlayer, &pos, 0.0f, 0.0f, &map->scts[0]);
 }
 
-#ifdef _WINDLL
-__declspec(dllexport)
-#endif
-int eventHandler(PlaydateAPI *pd, PDSystemEvent event, uint32_t arg) {
-    (void) arg;
-
-    if (event == kEventInit) {
-        playdate = pd;
-        playdate->system->setUpdateCallback(update, NULL);
-        if (CatchError()) {
-            haderror = true;
-            DisplayError();
-        } else {
-            map = M_Load("map01");
-            vector_t pos;
-            pos.x = 0.0f;
-            pos.y = 0.0f;
-            player = A_ActorSpawn(&A_ClassPlayer, &pos, 0.0f, 0.0f, &map->scts[0]);
-        }
-    }
-    
-    return 0;
+void B_MainLoop(void) {
+    A_ActorUpdate();
+    R_RenderViewpoint(player);
+    playdate->system->drawFPS(0, 0);
 }
