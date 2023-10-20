@@ -42,6 +42,7 @@ SRC = \
 	src/u_error.c \
 	src/u_file.c \
 	src/u_format.c \
+	src/u_list.c \
 	src/u_math.c \
 	src/u_vec.c
 

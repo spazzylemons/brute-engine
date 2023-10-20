@@ -7,18 +7,13 @@
 
 #include "b_types.h"
 #include "m_defs.h"
-
-// A node in the list of actors.
-// TODO if we need later on, we should make a generic circlar DLL impl
-typedef struct actorlist_t {
-    struct actorlist_t *prev;
-    struct actorlist_t *next;
-} actorlist_t;
+#include "u_list.h"
 
 // An actor. This is the base of all actor objects, which can derive from this
 // struct by including it as their first member.
 typedef struct {
-    actorlist_t list;
+    // Node in list of actors.
+    list_t list;
     // The actor's position.
     vector_t pos;
     // The actor's rotation.
@@ -28,11 +23,11 @@ typedef struct {
     // The sector the actor was last seen in.
     sector_t *sector;
     // The actor's class.
-    const struct actorclass_t *class;
+    const struct actorclass_s *class;
 } actor_t;
 
 // An actor class. Describes how an actor should act.
-typedef struct actorclass_t {
+typedef struct actorclass_s {
     // The size of the object to allocate.
     size_t size;
 
@@ -57,5 +52,8 @@ actor_t *A_ActorSpawn(
     float zpos,
     sector_t *sector
 );
+
+// Update all actors.
+void A_ActorUpdate(void);
 
 #endif

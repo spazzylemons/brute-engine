@@ -28,7 +28,7 @@ static int update(void *userdata) {
         haderror = true;
         DisplayError();
     } else {
-        player->class->update(player);
+        A_ActorUpdate();
         R_RenderViewpoint(player);
         playdate->system->drawFPS(0, 0);
     }

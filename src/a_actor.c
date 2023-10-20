@@ -2,33 +2,16 @@
 #include "b_core.h"
 
 // The list of actors.
-static actorlist_t actor_list = { &actor_list, &actor_list };
-
-// Link an actor to the list.
-static void ActorLink(actor_t *actor) {
-    actor->list.next = actor_list.next;
-    actor->list.prev = &actor_list;
-    actor_list.next->prev = &actor->list;
-    actor_list.next = &actor->list;
-}
-
-// Unlink an actor from the list and deallocate it.
-static void ActorDestroy(actor_t *actor) {
-    actorlist_t *prev = actor->list.prev;
-    actorlist_t *next = actor->list.next;
-    actor->list.prev->next = next;
-    actor->list.next->prev = prev;
-    Deallocate(actor);
-}
+static list_t actorlist = { &actorlist, &actorlist };
 
 void A_ActorClear(void) {
-    actorlist_t *list = &actor_list;
-    while (list->next != &actor_list) {
-        list = list->next;
-        Deallocate((actor_t *) list);
+    listiter_t iter;
+    U_ListIterInit(&iter, &actorlist);
+    actor_t *actor;
+
+    while ((actor = (actor_t *) U_ListIterNext(&iter)) != NULL) {
+        Deallocate(actor);
     }
-    actor_list.next = &actor_list;
-    actor_list.prev = &actor_list;
 }
 
 actor_t *A_ActorSpawn(
@@ -40,10 +23,8 @@ actor_t *A_ActorSpawn(
 ) {
     // Allocate actor.
     actor_t *actor = Allocate(class->size);
-    if (actor == NULL) {
-        return NULL;
-    }
     // Add to linked list.
+    U_ListInsert(&actorlist, &actor->list);
     // Fill in fields.
     U_VecCopy(&actor->pos, pos);
     actor->angle = angle;
@@ -56,4 +37,16 @@ actor_t *A_ActorSpawn(
     }
     // Return actor.
     return actor;
+}
+
+void A_ActorUpdate(void) {
+    listiter_t iter;
+    U_ListIterInit(&iter, &actorlist);
+    actor_t *actor;
+
+    while ((actor = (actor_t *) U_ListIterNext(&iter)) != NULL) {
+        if (actor->class->update != NULL) {
+            actor->class->update(actor);
+        }
+    }
 }
