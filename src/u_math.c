@@ -4,7 +4,10 @@
 
 float U_AngleAdd(float a, float b) {
     float result = fmodf(a + b, TAU);
-	if (result < 0.0f) {
+	// Wrap from -Pi to +Pi.
+	if (result > PI) {
+		result -= TAU;
+	} else if (result <= -PI) {
 		result += TAU;
 	}
     return result;
