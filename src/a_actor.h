@@ -16,10 +16,14 @@ typedef struct {
     list_t list;
     // The actor's position.
     vector_t pos;
-    // The actor's rotation.
-    float angle;
+    // The actor's horizontal velocity.
+    vector_t vel;
     // The actor's vertical position.
     float zpos;
+    // The actor's vertical velocity.
+    float zvel;
+    // The actor's rotation.
+    float angle;
     // The sector the actor was last seen in.
     sector_t *sector;
     // The actor's class.
@@ -49,9 +53,14 @@ actor_t *A_ActorSpawn(
     const actorclass_t *class,
     const vector_t *pos,
     float angle,
-    float zpos,
     sector_t *sector
 );
+
+// Common code for applying horizontal velocity.
+void A_ActorApplyVelocity(actor_t *this);
+
+// Common code for applying gravity.
+void A_ActorApplyGravity(actor_t *this);
 
 // Update all actors.
 void A_ActorUpdate(void);

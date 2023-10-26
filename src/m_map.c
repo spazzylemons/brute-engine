@@ -1,11 +1,38 @@
-#include "b_core.h"
 #include "m_iter.h"
 #include "m_map.h"
 #include "u_vec.h"
 
 #include <math.h>
 
-#define OBJ_RADIUS 20.0f
+// Height of object when colliding with ceilings.
+#define OBJECT_HEIGHT 56.0f
+
+static float WallPointDist(const wall_t *wall, const vector_t *point) {
+    return (wall->v2->y - wall->v1->y) * (point->x - wall->v1->x) -
+        (wall->v2->x - wall->v1->x) * (point->y - wall->v1->y);
+}
+
+bool M_SectorContainsPoint(const sector_t *sector, const vector_t *point) {
+    for (size_t i = 0; i < sector->num_walls; i++) {
+        const wall_t *wall = &sector->walls[i];
+        // Test if point lies in front of line.
+        if (WallPointDist(wall, point) < 0.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool M_SectorContainsCircle(const sector_t *sector, const vector_t *point, float radius) {
+    for (size_t i = 0; i < sector->num_walls; i++) {
+        const wall_t *wall = &sector->walls[i];
+        // Test if circle lies in front of line.
+        if (WallPointDist(wall, point) < -radius * wall->length) {
+            return false;
+        }
+    }
+    return true;
+}
 
 static sector_t *FindPlayerSector(sector_t *sector, const vector_t *point) {
     sectoriter_t iter;
@@ -94,6 +121,7 @@ static float GetCollisionTime(
 
 static const wall_t *SectorCollide(
     vector_t *pos,
+    float zpos,
     vector_t *delta,
     sector_t *sector
 ) {
@@ -126,13 +154,20 @@ static const wall_t *SectorCollide(
         for (size_t i = 0; i < sector->num_walls; i++) {
             const wall_t *wall = &sector->walls[i];
 
-            // Don't collide with portals. Instead, check their sectors if we
-            // may collide with the sector's walls.
+            // If the wall is a portal, and we overlap it during movement,
+            // add it to the queue of portals to check.
             if (wall->portal != NULL) {
                 if (AABBOverlap(&player_bounds, &wall->portal->bounds)) {
                     M_SectorIterPush(&iter, wall->portal);
                 }
-                continue;
+
+                // If we don't collide with the lower or upper parts of the portal,
+                // we will pass through. There's some allowance for colliding with
+                // the lower portion, to allow actors to climb stairs.
+                if (zpos + OBJECT_HEIGHT < wall->portal->ceiling &&
+                    zpos + MAX_STAIR_HEIGHT > wall->portal->floor) {
+                    continue;
+                }
             }
 
             if (U_VecDot(&wall->normal, delta) >= 0.0f) {
@@ -166,16 +201,20 @@ static const wall_t *SectorCollide(
     return closest;
 }
 
-sector_t *M_MoveAndSlide(sector_t *sector, vector_t *pos, vector_t *delta) {
-    // failsafe - only allow so many sector changes
-    // this hasn't been triggered to my knowledge and may not be useful
+sector_t *M_MoveAndSlide(
+    sector_t *sector,
+    vector_t *pos,
+    float zpos,
+    vector_t *delta
+) {
+    // Only allow so many sector changes.
     uint8_t changes_left = 5;
-    while (changes_left-- && U_VecLenSq(delta) > 0.0001f) {
+    while (changes_left-- && U_VecLenSq(delta) > 0.001f) {
         vector_t old_delta;
         U_VecCopy(&old_delta, delta);
-        const wall_t *wall = SectorCollide(pos, delta, sector);
+        const wall_t *wall = SectorCollide(pos, zpos, delta, sector);
         if (wall != NULL) {
-            if (wall->portal == NULL && U_VecDistSq(delta, &old_delta) < 0.0001f) {
+            if (wall->portal == NULL && U_VecDistSq(delta, &old_delta) < 0.001f) {
                 break;
             }
             sector = FindPlayerSector(sector, pos);
@@ -185,8 +224,10 @@ sector_t *M_MoveAndSlide(sector_t *sector, vector_t *pos, vector_t *delta) {
             break;
         }
     }
-    if (changes_left == 0) {
-        playdate->system->logToConsole("Too many wall slides!");
+    // Zero out velocity if it's too small.
+    if (U_VecLenSq(delta) <= 0.001f) {
+        delta->x = 0.0f;
+        delta->y = 0.0f;
     }
     return sector;
 }

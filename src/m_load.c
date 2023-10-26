@@ -1,4 +1,5 @@
 #include "b_core.h"
+#include "i_memory.h"
 #include "m_load.h"
 #include "u_error.h"
 #include "u_file.h"
@@ -34,6 +35,10 @@ typedef struct PACKED {
     int16_t floor;
     // The ceiling height.
     int16_t ceiling;
+    // The flat ID for the floor.
+    uint8_t floorflat;
+    // The flat ID for the ceiling.
+    uint8_t ceilflat;
 } file_sector_t;
 
 // Format of a wall used in file.
@@ -46,11 +51,20 @@ typedef struct PACKED {
     uint16_t portal;
     // The texture X offset.
     uint8_t xoffset;
+    // The texture Y offset.
+    uint8_t yoffset;
+    // The top texture patch ID.
+    uint8_t textop;
+    // The middle texture patch ID.
+    uint8_t texmid;
+    // The bottom texture patch ID.
+    uint8_t texbot;
 } file_wall_t;
+
+static char pathbuf[64];
 
 static void *ReadMapFile(const char *name, const char *file, size_t *szp, size_t mbsz) {
     // Format map path.
-    char pathbuf[64];
     FormatString(pathbuf, sizeof(pathbuf), "/maps/%s/%s", name, file);
     // Read file.
     void *result = U_FileRead(pathbuf, szp);
@@ -58,6 +72,81 @@ static void *ReadMapFile(const char *name, const char *file, size_t *szp, size_t
     *szp /= mbsz;
     // Return file contents.
     return result;
+}
+
+// Load a patch from a bitmap.
+static void LoadPatch(patch_t *patch, const char *path) {
+    size_t size;
+    file_patch_t *fpatch = U_FileRead(path, &size);
+    // Verify the allocation at least has the dimensions.
+    if (size < 1) {
+        Error("M_Load: Patch '%s' missing dimensions", path);
+    }
+    // Get the dimensions.
+    uint16_t width = 1 << (fpatch->dimensions & 15);
+    uint16_t height = 1 << (fpatch->dimensions >> 4);
+    if (width < 1 || height < 1) {
+        Error("M_Load: Patch '%s' is too small", path);
+    }
+    // Verify the size is as promised.
+    size_t datasize = height * width;
+    if (size < 1 + datasize) {
+        Error("M_Load: Patch '%s' is missing data", path);
+    }
+    // Allocate patch and copy data over.
+    patch->width = width;
+    patch->height = height;
+    patch->data = Allocate(datasize);
+    memcpy(&patch->data[0], &fpatch->data[0], datasize);
+    // Free the file data.
+    Deallocate(fpatch);
+}
+
+static void LoadPatches(const char *name, map_t *map) {
+    char *fpatches = ReadMapFile(name, "patches", &map->numpatches, sizeof(char[8]));
+    // Each 8 bytes is a patch name.
+    map->patches = Allocate(sizeof(patch_t) * map->numpatches);
+    for (size_t i = 0; i < map->numpatches; i++) {
+        // Copy into buffer.
+        char patchname[9];
+        memset(patchname, 0, sizeof(patchname));
+        strncpy(patchname, &fpatches[8 * i], 8);
+        // Load patch from file.
+        FormatString(pathbuf, sizeof(pathbuf), "/patches/%s", patchname);
+        LoadPatch(&map->patches[i], pathbuf);
+    }
+    // Free file data.
+    Deallocate(fpatches);
+}
+
+// Load a flat from a bitmap.
+static void LoadFlat(flat_t *flat, const char *path) {
+    size_t size;
+    uint8_t *fflat = U_FileRead(path, &size);
+    if (size < 4096) {
+        Error("M_Load: Flat '%s' is missing data", path);
+    }
+    // Copy the data.
+    memcpy(&flat->data[0], fflat, sizeof(flat->data));
+    // Free file data.
+    Deallocate(fflat);
+}
+
+static void LoadFlats(const char *name, map_t *map) {
+    char *fflats = ReadMapFile(name, "flats", &map->numflats, sizeof(char[8]));
+    // Each 8 bytes is a patch name.
+    map->flats = Allocate(sizeof(flat_t) * map->numflats);
+    for (size_t i = 0; i < map->numflats; i++) {
+        // Copy into buffer.
+        char flatname[9];
+        memset(flatname, 0, sizeof(flatname));
+        strncpy(flatname, &fflats[8 * i], 8);
+        // Load patch from file.
+        FormatString(pathbuf, sizeof(pathbuf), "/flats/%s", flatname);
+        LoadFlat(&map->flats[i], pathbuf);
+    }
+    // Free file data.
+    Deallocate(fflats);
 }
 
 static void LoadVertices(const char *name, map_t *map) {
@@ -71,6 +160,32 @@ static void LoadVertices(const char *name, map_t *map) {
     }
     // Free file data.
     Deallocate(fvtxs);
+}
+
+static patch_t *GetPatchById(map_t *map, uint8_t id) {
+    if (id == 0) {
+        // No patch.
+        return NULL;
+    }
+    // Check patch array.
+    id -= 1;
+    if (id >= map->numpatches) {
+        Error("M_Load: Patch index %d is out of range", id);
+    }
+    return &map->patches[id];
+}
+
+static flat_t *GetFlatById(map_t *map, uint8_t id) {
+    if (id == 0) {
+        // No flat. Sky will be used instead.
+        return NULL;
+    }
+    // Check flat array.
+    id -= 1;
+    if (id >= map->numflats) {
+        Error("M_Load: Flat index %d is out of range", id);
+    }
+    return &map->flats[id];
 }
 
 static void LoadWalls(const char *name, map_t *map) {
@@ -90,10 +205,13 @@ static void LoadWalls(const char *name, map_t *map) {
         // Store the portal index directly into the portal pointer. The sector
         // conversion routine will finish the conversion.
         wall->portal = (void *) (uintptr_t) fwall->portal;
-        // Store the wall patch.
-        wall->patch = map->patches;
+        // Store the wall patches.
+        wall->toppatch = GetPatchById(map, fwall->textop);
+        wall->midpatch = GetPatchById(map, fwall->texmid);
+        wall->botpatch = GetPatchById(map, fwall->texbot);
         // Store the wall's offsets.
         wall->xoffset = fwall->xoffset;
+        wall->yoffset = fwall->yoffset;
     }
     // Free file data.
     Deallocate(fwalls);
@@ -167,66 +285,19 @@ static void LoadSectors(const char *name, map_t *map) {
         sector->next_seen = NULL;
         sector->next_queue = NULL;
         // Set flats.
-        sector->floorflat = map->flats;
+        sector->floorflat = GetFlatById(map, fsector->floorflat);
+        sector->ceilflat = GetFlatById(map, fsector->ceilflat);
     }
     // Free file data.
     Deallocate(fscts);
-}
-
-// Load a flat from a bitmap.
-static flat_t *LoadFlat(const char *path) {
-    size_t size;
-    uint8_t *fflat = U_FileRead(path, &size);
-    if (size < 4096) {
-        Error("M_Load: Flat '%s' is missing data", path);
-    }
-    // Allocate the flat.
-    flat_t *flat = Allocate(sizeof(flat_t));
-    flat->next = NULL;
-    memcpy(&flat->data[0], fflat, sizeof(flat->data));
-    // Free file data.
-    Deallocate(fflat);
-    // Return the new flat.
-    return flat;
-}
-
-// Load a patch from a bitmap.
-static patch_t *LoadPatch(const char *path) {
-    size_t size;
-    file_patch_t *fpatch = U_FileRead(path, &size);
-    // Verify the allocation at least has the dimensions.
-    if (size < 1) {
-        Error("M_Load: Patch '%s' missing dimensions", path);
-    }
-    // Get the dimensions.
-    uint16_t width = 1 << (fpatch->dimensions >> 4);
-    uint16_t height = 1 << (fpatch->dimensions & 15);
-    if (width < 1 || height < 1) {
-        Error("M_Load: Patch '%s' is too small", path);
-    }
-    // Verify the size is as promised.
-    size_t datasize = height * width;
-    if (size < 1 + datasize) {
-        Error("M_Load: Patch '%s' is missing data", path);
-    }
-    // Allocate patch and copy data over.
-    patch_t *patch = Allocate(sizeof(patch_t) + datasize);
-    patch->next = NULL;
-    patch->width = width;
-    patch->height = height;
-    memcpy(&patch->data[0], &fpatch->data[0], datasize);
-    // Free the file data.
-    Deallocate(fpatch);
-    // Return the new patch.
-    return patch;
 }
 
 map_t *M_Load(const char *name) {
     // Allocate map.
     map_t *map = Allocate(sizeof(map_t));
     // Load the textures.
-    map->patches = LoadPatch("patches/wall");
-    map->flats = LoadFlat("flats/floor");
+    LoadPatches(name, map);
+    LoadFlats(name, map);
     // Load each part of the map.
     LoadVertices(name, map);
     LoadWalls(name, map);
@@ -238,23 +309,10 @@ void M_Free(map_t *map) {
     Deallocate(map->vtxs);
     Deallocate(map->walls);
     Deallocate(map->scts);
+    for (size_t i = 0; i < map->numpatches; i++) {
+        Deallocate(map->patches[i].data);
+    }
     Deallocate(map->patches);
     Deallocate(map->flats);
     Deallocate(map);
-}
-
-static bool PointInFrontOfWall(const wall_t *wall, const vector_t *point) {
-    return (wall->v2->y - wall->v1->y) * (point->x - wall->v1->x) >
-        (wall->v2->x - wall->v1->x) * (point->y - wall->v1->y);
-}
-
-bool M_SectorContainsPoint(const sector_t *sector, const vector_t *point) {
-    for (size_t i = 0; i < sector->num_walls; i++) {
-        const wall_t *wall = &sector->walls[i];
-        // Test if point lies in front of line.
-        if (!PointInFrontOfWall(wall, point)) {
-            return false;
-        }
-    }
-    return true;
 }

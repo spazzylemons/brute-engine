@@ -1,14 +1,12 @@
 #ifndef BRUTE_B_CORE_H
 #define BRUTE_B_CORE_H
 
+/**
+ * TODO remove this or otherwise clean this up.
+ */
+
 #include "pd_api.h"
 
 extern PlaydateAPI *playdate;
-
-// Allocate memory. Size can be 0.
-void *Allocate(size_t size);
-
-// Free memory. Freeing NULL does nothing.
-void Deallocate(void *ptr);
 
 #endif

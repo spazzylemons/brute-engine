@@ -4,21 +4,45 @@
 
 #include <math.h>
 
+#define MAXSECTORDEPTH 32
+
+typedef struct {
+    const sector_t *sector;
+    float left, right;
+} sectorstack_t;
+
 void R_DrawSector(sector_t *sector, float left, float right) {
-    rendersector = sector;
-    // Check each wall in the sector.
-    for (size_t i = 0; i < sector->num_walls; i++) {
-        const wall_t *wall = &sector->walls[i];
-        // Bounds of wall.
-        float nleft = left;
-        float nright = right;
-        // Check if portal should be drawn.
-        bool draw_portal = R_DrawWall(wall, &nleft, &nright);
-        if (draw_portal && fabsf(nleft - nright) >= 0.5f) {
-            // If it should be drawn, draw it recursively using clipped bounds.
-            R_DrawSector(wall->portal, nleft, nright);
-            // Restore globals.
-            rendersector = sector;
+    // Stack of sector data.
+    static sectorstack_t sectorstack[MAXSECTORDEPTH];
+
+    // Initialize stack.
+    uint8_t depth = 1;
+    sectorstack[0].sector = sector;
+    sectorstack[0].left = left;
+    sectorstack[0].right = right;
+
+    // Recursive stack drawing.
+    do {
+        // Pop from stack.
+        --depth;
+        rendersector = sectorstack[depth].sector;
+        left = sectorstack[depth].left;
+        right = sectorstack[depth].right;
+        // Check each wall in the sector.
+        for (size_t i = 0; i < rendersector->num_walls; i++) {
+            const wall_t *wall = &rendersector->walls[i];
+            // Bounds of wall.
+            float nleft = left;
+            float nright = right;
+            // Check if portal should be drawn.
+            if (R_DrawWall(wall, &nleft, &nright)) {
+                if (__builtin_expect(depth < MAXSECTORDEPTH, 0)) {
+                    sectorstack[depth].sector = wall->portal;
+                    sectorstack[depth].left = nleft;
+                    sectorstack[depth].right = nright;
+                    depth++;
+                }
+            }
         }
-    }
+    } while (depth != 0);
 }

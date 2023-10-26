@@ -1,4 +1,5 @@
 #include "b_core.h"
+#include "i_memory.h"
 #include "u_error.h"
 #include "u_file.h"
 

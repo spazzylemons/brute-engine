@@ -22,6 +22,9 @@ typedef struct {
     list_t *next;
 } listiter_t;
 
+// Define an empty list.
+#define EMPTY_LIST(_name_) list_t _name_ = { &_name_, &_name_ }
+
 // Initialize a list.
 void U_ListInit(list_t *list);
 

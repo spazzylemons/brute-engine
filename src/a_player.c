@@ -1,6 +1,5 @@
 #include "a_classes.h"
 #include "b_core.h"
-#include "m_map.h"
 #include "u_error.h"
 #include "u_math.h"
 
@@ -94,15 +93,14 @@ static void Update(actor_t *this) {
     } else {
         MovePlayerCrank(this, &delta, held);
     }
-    this->sector = M_MoveAndSlide(this->sector, &this->pos, &delta);
 
-    if (held & kButtonA) {
-        this->zpos += 4.0f;
-    }
+    // Gradually approach target velocity.
+    U_VecScaledAdd(&this->vel, &delta, 0.25f);
+    U_VecScale(&this->vel, 0.8f);
 
-    if (held & kButtonB) {
-        this->zpos -= 4.0f;
-    }
+    // Physics step.
+    A_ActorApplyVelocity(this);
+    A_ActorApplyGravity(this);
 }
 
 const actorclass_t A_ClassPlayer = {

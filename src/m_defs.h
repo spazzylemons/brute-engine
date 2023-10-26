@@ -7,21 +7,17 @@
 #include <stdint.h>
 
 // A wall texture, or "patch".
-typedef struct patch_s {
-    // The next patch in the list.
-    struct patch_s *next;
+typedef struct {
     // The width of the texture.
     uint16_t width;
     // The height of the texture. Stride is height.
     uint16_t height;
     // The texture data, stored in columns.
-    uint8_t data[0];
+    uint8_t *data;
 } patch_t;
 
 // A floor/ceiling texture, or "flat". All flats are 64x64 pixels in size.
-typedef struct flat_s {
-    // The next flat in the list.
-    struct flat_s *next;
+typedef struct {
     // The texture data, stored in rows.
     uint8_t data[64 * 64];
 } flat_t;
@@ -38,11 +34,17 @@ typedef struct {
     // Precalculated length of wall.
     float length;
     // Texture X offset.
-    float xoffset;
+    uint8_t xoffset;
+    // Texture Y offset.
+    uint8_t yoffset;
     // The sector this wall is a portal to, or NULL if solid.
     struct sector_s *portal;
-    // The patch used for this wall.
-    patch_t *patch;
+    // The top patch used for this wall.
+    patch_t *toppatch;
+    // The middle patch used for this wall.
+    patch_t *midpatch;
+    // The bottom patch used for this wall.
+    patch_t *botpatch;
 } wall_t;
 
 typedef struct sector_s {
@@ -62,6 +64,8 @@ typedef struct sector_s {
     int16_t ceiling;
     // The flat used for this sector's floor.
     flat_t *floorflat;
+    // The flat used for this sector's ceiling.
+    flat_t *ceilflat;
 } sector_t;
 
 typedef struct {
@@ -77,13 +81,14 @@ typedef struct {
     wall_t *walls;
     // The number of walls in this map.
     size_t numwalls;
-    // The linked list of patches in this map.
+    // The patches in this map.
     patch_t *patches;
-    // The flat used in this map.
+    // The number of patches in this map.
+    size_t numpatches;
+    // The flats in this map.
     flat_t *flats;
+    // The number of flats in this map.
+    size_t numflats;
 } map_t;
-
-// Test if a point is inside a sector.
-bool M_SectorContainsPoint(const sector_t *sector, const vector_t *point);
 
 #endif

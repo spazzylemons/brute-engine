@@ -11,7 +11,17 @@ import re
 import struct
 import sys
 
+from PIL import Image
+
 UNQUOTE = re.compile(r'\\(.)')
+
+PALETTE_CONV = (
+    0x00, 0x10, 0x20, 0x30,
+    0x40, 0x50, 0x60, 0x70,
+    0x7f, 0x8f, 0x9f, 0xaf,
+    0xbf, 0xcf, 0xdf, 0xef,
+    0xff
+)
 
 from parsimonious import Grammar, NodeVisitor
 
@@ -94,20 +104,47 @@ def handle_udmf(content, mapname):
         x = round(vertex['x'])
         y = round(vertex['y'])
         out_vertices.extend(struct.pack('<hh', x, y))
-    # Get which walls belong to which sector.
+    # Collection of patch names to use.
+    patchnames = {}
+    def get_patch_id(name):
+        # Lack of patch means ID 0
+        if name is None:
+            return 0
+        # Check if already registered
+        if name not in patchnames:
+            # IDs start at 1, because 0 means no patch
+            patchnames[name] = len(patchnames) + 1
+        return patchnames[name]
+    # Collection of flat names to use.
+    flatnames = {}
+    def get_flat_id(name):
+        # TODO check sky texture and return 0
+        # Check if already registered
+        if name not in flatnames:
+            # IDs start at 1, because 0 means no flat
+            flatnames[name] = len(flatnames) + 1
+        return flatnames[name]
+    # Get which walls belong to which sector, and other sidedef info.
+    def get_sidedef_info(sidedef_id):
+        sidedef = mapdata['sidedef'][sidedef_id]
+        sector = sidedef['sector']
+        xoffset = sidedef.get('offsetx', 0)
+        yoffset = sidedef.get('offsety', 0)
+        texturetop = get_patch_id(sidedef.get('texturetop'))
+        texturemiddle = get_patch_id(sidedef.get('texturemiddle'))
+        texturebottom = get_patch_id(sidedef.get('texturebottom'))
+        return sector, xoffset, yoffset, texturetop, texturemiddle, texturebottom
+
     walls = [[] for _ in range(len(mapdata['sector']))]
     for linedef in mapdata['linedef']:
         if 'twosided' in linedef:
-            front_sector = mapdata['sidedef'][linedef['sidefront']]['sector']
-            back_sector = mapdata['sidedef'][linedef['sideback']]['sector']
-            front_xoffset = mapdata['sidedef'][linedef['sidefront']].get('offsetx', 0)
-            back_xoffset = mapdata['sidedef'][linedef['sideback']].get('offsetx', 0)
-            walls[front_sector].append((linedef['v1'], linedef['v2'], back_sector, front_xoffset))
-            walls[back_sector].append((linedef['v2'], linedef['v1'], front_sector, back_xoffset))
+            front_data = get_sidedef_info(linedef['sidefront'])
+            back_data = get_sidedef_info(linedef['sideback'])
+            walls[front_data[0]].append((linedef['v1'], linedef['v2'], back_data[0], *front_data[1:]))
+            walls[back_data[0]].append((linedef['v2'], linedef['v1'], front_data[0], *back_data[1:]))
         else:
-            front_sector = mapdata['sidedef'][linedef['sidefront']]['sector']
-            front_xoffset = mapdata['sidedef'][linedef['sidefront']].get('offsetx', 0)
-            walls[front_sector].append((linedef['v1'], linedef['v2'], front_sector, front_xoffset))
+            front_data = get_sidedef_info(linedef['sidefront'])
+            walls[front_data[0]].append((linedef['v1'], linedef['v2'], *front_data))
     # Fix each wall set so its lines are in order.
     for i, wall_set in enumerate(walls):
         new_wall_set = [wall_set[0]]
@@ -119,16 +156,29 @@ def handle_udmf(content, mapname):
     out_sectors = bytearray()
     wall_index = 0
     for j, wall_set in enumerate(walls):
-        out_sectors.extend(struct.pack('<HHHH',
+        mapsector = mapdata['sector'][j]
+        out_sectors.extend(struct.pack('<HHhhBB',
             len(wall_set),
             wall_index,
-            mapdata['sector'][j].get('heightfloor', 0),
-            mapdata['sector'][j].get('heightceiling', 128),
+            mapsector.get('heightfloor', 0),
+            mapsector.get('heightceiling', 0),
+            get_flat_id(mapsector['texturefloor']),
+            get_flat_id(mapsector['textureceiling']),
         ))
         for i, wall in enumerate(wall_set):
             assert wall[1] == wall_set[(i+1)%len(wall_set)][0]
-            out_walls.extend(struct.pack('<HHB', wall[0], wall[2], wall[3]))
+            out_walls.extend(struct.pack('<HHBBBBB', wall[0], wall[2], wall[3], wall[4], wall[5], wall[6], wall[7]))
             wall_index += 1
+    out_patches = bytearray()
+    for name in patchnames:
+        encoded_name = name.lower().encode()
+        assert len(encoded_name) <= 8
+        out_patches.extend(encoded_name.ljust(8, b'\0'))
+    out_flats = bytearray()
+    for name in flatnames:
+        encoded_name = name.lower().encode()
+        assert len(encoded_name) <= 8
+        out_flats.extend(encoded_name.ljust(8, b'\0'))
     # If uncommented, outputs a list of Desmos equations to plot the map.
     # for wall_set in walls:
     #     # \operatorname{polygon}\left(\left(1,2\right),\left(3,4\right)\right)
@@ -151,26 +201,22 @@ def handle_udmf(content, mapname):
         file.write(out_sectors)
     with open(mappath + '/walls', 'wb') as file:
         file.write(out_walls)
+    with open(mappath + '/patches', 'wb') as file:
+        file.write(out_patches)
+    with open(mappath + '/flats', 'wb') as file:
+        file.write(out_flats)
 
-def read_patch(content):
-    width, height = struct.unpack('<HH', content[0:4])
-    pixels = bytearray(width * height)
-    for x in range(width):
-        offset = struct.unpack('<I', content[8+4*x:12+4*x])[0]
-        while (y := content[offset]) != 0xff:
-            offset += 1
-            length = content[offset]
-            offset += 2
-            for _ in range(length):
-                assert 0 <= y < height
-                pixels[(width * y) + x] = content[offset]
-                y += 1
-                offset += 1
-            offset += 1
-    return width, height, pixels
+def read_image(filepath):
+    img = Image.open(filepath)
+    width, height = img.size
+    result = bytearray(width * height)
+    for y in range(height):
+        for x in range(width):
+            result[(y * width) + x] = PALETTE_CONV.index(img.getpixel((x, y)))
+    return width, height, result
 
-def write_patch(name, content):
-    width, height, pixels = read_patch(content)
+def write_patch(filepath, name):
+    width, height, pixels = read_image(filepath)
     assert width >= 1 and width < 65536
     assert height >= 1 and height < 65536
     assert (width & (width - 1)) == 0
@@ -184,73 +230,52 @@ def write_patch(name, content):
     with open(patchpath + '/' + name.lower(), 'wb') as file:
         file.write(result)
 
-def write_flat(name, content):
-    # result = bytearray()
-    # for y in range(64):
-    #     row = bytearray()
-    #     for x in range(64):
-    #         result.append(content[(64 * y) + x + x1])
-    #         pixel = 0
-    #         for x1 in range(2):
-    #             pixel <<= 4
-    #             p = content[(64 * y) + x + x1]
-    #             assert 0 <= p < 16
-    #             pixel |= p
-    #         row.append(pixel)
-    #     result += row
+def write_flat(filepath, name):
+    width, height, pixels = read_image(filepath)
+    assert width == 64 and height == 64
     flatpath = sys.argv[2] + '/flats/'
     os.makedirs(flatpath, exist_ok=True)
     with open(flatpath + '/' + name.lower(), 'wb') as file:
-        file.write(content)
+        file.write(pixels)
 
-last_map_marker = None
-in_patches = False
-in_flats = False
-def handle_lump(name, content):
-    global last_map_marker
-    global in_patches
-    global in_flats
+# Game assets are stored in GZDoom directory format before being converted to
+# custom formats for our engine.
 
-    if len(name) == 5 and name[0:3] == 'MAP' and name[3:5].isdigit():
-        last_map_marker = name
-        return
-    elif name == 'ENDMAP':
-        last_map_marker = None
-        return
-
-    if not in_patches and name == 'P_START':
-        in_patches = True
-        return
-    elif in_patches and name == 'P_END':
-        in_patches = False
-        return
-
-    if not in_flats and name == 'F_START':
-        in_flats = True
-        return
-    elif in_flats and name == 'F_END':
-        in_flats = False
-        return
-
-    if last_map_marker is not None and name == 'TEXTMAP':
-        handle_udmf(content, last_map_marker)
-    elif in_patches:
-        write_patch(name, content)
-    elif in_flats:
-        write_flat(name, content)
-
-# Parse WAD file.
-lumps = {}
-with open(sys.argv[1], 'rb') as wadfile:
-    if wadfile.read(4) != b'PWAD':
-        print('Not a PWAD', file=sys.stderr)
-        exit(1)
-    numlumps, infotableofs = struct.unpack('<ii', wadfile.read(8))
-    for i in range(numlumps):
-        wadfile.seek(infotableofs + 16 * i, io.SEEK_SET)
-        filepos, size = struct.unpack('<ii', wadfile.read(8))
-        name = wadfile.read(8)
-        if 0 in name:
-            name = name[:name.index(0)]
-        wadfile.seek(filepos, io.SEEK_SET)
-        handle_lump(name.decode(), wadfile.read(size))
+# Convert flats.
+src_flatdir = sys.argv[1] + '/flats'
+for filename in os.listdir(src_flatdir):
+    # Get output name.
+    name, _ = os.path.splitext(filename)
+    name = name.lower()
+    # Load PNG.
+    write_flat(src_flatdir + '/' + filename, name)
+# Convert patches.
+src_patchdir = sys.argv[1] + '/patches'
+for filename in os.listdir(src_patchdir):
+    # Get output name.
+    name, _ = os.path.splitext(filename)
+    name = name.lower()
+    # Load PNG.
+    write_patch(src_patchdir + '/' + filename, name)
+# Convert maps.
+src_mapdir = sys.argv[1] + '/maps'
+for filename in os.listdir(src_mapdir):
+    mapname, _ = os.path.splitext(filename)
+    mapname = mapname.lower()
+    # Parse WAD file.
+    lumps = {}
+    with open(src_mapdir + '/' + filename, 'rb') as wadfile:
+        if wadfile.read(4) != b'PWAD':
+            print('Not a PWAD', file=sys.stderr)
+            exit(1)
+        numlumps, infotableofs = struct.unpack('<ii', wadfile.read(8))
+        for i in range(numlumps):
+            wadfile.seek(infotableofs + 16 * i, io.SEEK_SET)
+            filepos, size = struct.unpack('<ii', wadfile.read(8))
+            name = wadfile.read(8)
+            if 0 in name:
+                name = name[:name.index(0)]
+            name = name.decode()
+            if name == 'TEXTMAP':
+                wadfile.seek(filepos, io.SEEK_SET)
+                handle_udmf(wadfile.read(size), mapname)

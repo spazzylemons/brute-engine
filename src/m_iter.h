@@ -33,4 +33,7 @@ sector_t *M_SectorIterPop(sectoriter_t *iter);
 // Clean up links in all iterated sectors.
 void M_SectorIterCleanup(sectoriter_t *iter);
 
+// Return true if sector can be pushed to the iterator.
+bool M_SectorCanBePushed(sectoriter_t *iter, sector_t *sector);
+
 #endif

@@ -3,8 +3,8 @@
  */
 
 void B_MainInit(void);
-
 void B_MainLoop(void);
+void B_MainQuit(void);
 
 #include "pd_api.h"
 #include "u_error.h"
@@ -39,14 +39,28 @@ __declspec(dllexport)
 int eventHandler(PlaydateAPI *pd, PDSystemEvent event, uint32_t arg) {
     (void) arg;
 
-    if (event == kEventInit) {
-        playdate = pd;
-        playdate->system->setUpdateCallback(update, NULL);
-        if (CatchError()) {
-            haderror = true;
-            DisplayError();
-        } else {
-            B_MainInit();
+    switch (event) {
+        case kEventInit: {
+            playdate = pd;
+            playdate->system->setUpdateCallback(update, NULL);
+            if (CatchError()) {
+                haderror = true;
+                DisplayError();
+            } else {
+                B_MainInit();
+            }
+            break;
+        }
+
+        case kEventTerminate: {
+            if (!haderror) {
+                B_MainQuit();
+            }
+            break;
+        }
+
+        default: {
+            break;
         }
     }
     

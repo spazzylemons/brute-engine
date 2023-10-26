@@ -9,8 +9,8 @@ static const wall_t *renderwall; // The current wall.
 static float wallsine;           // Sine multiply for wall rotation.
 static float wallcosine;         // Cosine multiply for wall rotation.
 
-static int32_t heightceiling; // Height to draw ceiling at.
-static int32_t heightfloor;   // Height to draw floor at.
+static fixed_t heightceiling; // Height to draw ceiling at.
+static fixed_t heightfloor;   // Height to draw floor at.
 
 static int32_t distleft;  // Distance of left side of wall.
 static int32_t distright; // Distance of right side of wall.
@@ -18,7 +18,7 @@ static int32_t distright; // Distance of right side of wall.
 static int32_t uvleft;  // Left UV X coordinate.
 static int32_t uvright; // Right UV X coordinate.
 
-static int32_t rendereyeheight; // Eye height to render at.
+static fixed_t rendereyeheight; // Eye height to render at.
 
 // Enum for how to clip sector bounds.
 typedef enum {
@@ -72,91 +72,96 @@ static void RotatePoint(vector_t *v) {
 }
 
 static void DrawFlats(void) {
-    R_DrawFlat(rendersector->floorflat, prevminy, renderminy, heightceiling);
+    R_DrawFlat(rendersector->ceilflat, prevminy, renderminy, heightceiling);
     R_DrawFlat(rendersector->floorflat, rendermaxy, prevmaxy, heightfloor);
 }
 
-// Draw a column.
-static void DrawColumn(
-    // Column of patch to draw.
-    const uint8_t *source,
-    // Height of column patch.
-    int32_t scale,
-    // Height of wall.
-    int32_t height,
-    // The x coordinate.
-    int32_t x,
-    // The top Y coordinate.
-    int32_t y1,
-    // The bottom Y coordinate.
-    int32_t y2
-) {
-    dc_source = source;
-    dc_height = scale;
-    dc_scale = (height << 12) / (y2 - y1);
-    dc_offset = y1;
-    dc_x = x;
-    // Check bounds.
-    if (y1 < renderminy[x]) y1 = renderminy[x];
-    else if (y1 > rendermaxy[x]) y1 = rendermaxy[x];
-    if (y2 < renderminy[x]) y2 = renderminy[x];
-    else if (y2 > rendermaxy[x]) y2 = rendermaxy[x];
-    dc_yh = y1;
-    dc_yl = y2;
-    R_DrawColumn();
+static uint8_t ClipYPoint(int32_t y, int32_t x) {
+    if (y < renderminy[x]) {
+        return renderminy[x];
+    } else if (y > rendermaxy[x]) {
+        return rendermaxy[x];
+    }
+    return y;
+}
+
+static void SetColumnOffset(int32_t height, const patch_t *patch) {
+    if (patch != NULL) {
+        dc_offset = (renderwall->yoffset << FRACBITS) -
+            (height & (((1 << FRACBITS) - 1) | ((patch->height - 1) << FRACBITS)));
+    }
 }
 
 static void DrawWallColumns(
-    bool drawwall,
+    const patch_t *patch,
     cliptype_t ceilclip,
     cliptype_t floorclip
 ) {
-    const patch_t *patch = renderwall->patch;
-    int32_t y1h = (SCRNDISTI * heightceiling) / distleft;
-    int32_t y2h = (SCRNDISTI * heightceiling) / distright;
-    int32_t y1l = (SCRNDISTI * heightfloor) / distleft;
-    int32_t y2l = (SCRNDISTI * heightfloor) / distright;
-    int32_t dx = renderxmax - renderxmin;
+    // Location of wall endpoints.
+    fixed_t hfrac = (SCRNDISTI * heightceiling) / distleft;
+    fixed_t lfrac = (SCRNDISTI * heightfloor) / distleft;
+    // X distance to draw.
+    uint16_t dx = renderxmax - renderxmin;
+    // Factor to scale wall endpoint step values.
+    int32_t stepnum = SCRNDISTI * (distleft - distright);
+    int32_t stepden = distleft * distright * dx;
+    fixed_t stepfac = (stepnum << FRACBITS) / stepden;
+    // Amount to move wall endpoints after each column.
+    fixed_t hstep = R_FixedMul(heightceiling, stepfac);
+    fixed_t lstep = R_FixedMul(heightfloor, stepfac);
+    // Texture scaling values.
+    fixed_t scale = (SCRNDISTI << INTBITS) / distleft;
+    fixed_t scalestep = stepfac << (INTBITS - FRACBITS);
+    // Texture drawing values.
+    int32_t uend = distright * dx;
     int32_t du = distleft * (uvright - uvleft);
     int32_t dz = distright - distleft;
-    int32_t hfrac = y1h << 12;
-    int32_t lfrac = y1l << 12;
-    int32_t hstep = ((y2h - y1h) << 12) / dx;
-    int32_t lstep = ((y2l - y1l) << 12) / dx;
-
-    for (int32_t x = 0; x < dx; x++) {
-        int32_t num1 = du * x;
-        int32_t den1 = (distright * dx) - x * dz;
-        int32_t whichx = ((uvleft + (num1 / den1)) >> 4) & (patch->width - 1);
+    // Preset height of texture.
+    if (patch != NULL) {
+        dc_height = patch->height;
+    }
+    // Wall drawing loop.
+    for (uint16_t x = renderxmin; x < renderxmax; x++) {
+        // Find integer endpoints on screen.
+        int32_t yh = (hfrac >> FRACBITS) + (LCD_ROWS >> 1);
+        int32_t yl = (lfrac >> FRACBITS) + (LCD_ROWS >> 1);
+        // Draw patch if present.
+        if (patch != NULL) {
+            // Calculate which column to render.
+            uint16_t x1 = x - renderxmin;
+            int32_t num = du * x1;
+            int32_t den = uend - x1 * dz;
+            uint16_t whichx = ((uvleft + (num / den)) >> 4) & (patch->width - 1);
+            // Set parameters.
+            dc_source = &patch->data[whichx * patch->height];
+            dc_scale = 0xffffffffu / (uint32_t) scale;
+            dc_x = x;
+            // Check bounds.
+            dc_yh = ClipYPoint(yh, x);
+            dc_yl = ClipYPoint(yl, x);
+            // Draw the column.
+            R_DrawColumn();
+        }
+        // Update bounds.
+        prevminy[x] = renderminy[x];
+        prevmaxy[x] = rendermaxy[x];
+        TryClip(ceilclip, yh, x);
+        TryClip(floorclip, yl, x);
+        // Step accumulators.
         hfrac += hstep;
         lfrac += lstep;
-        int32_t yh = (hfrac >> 12) + 120;
-        int32_t yl = (lfrac >> 12) + 120;
-        if (drawwall) {
-            DrawColumn(
-                &patch->data[whichx * patch->height],
-                patch->height,
-                heightfloor - heightceiling,
-                x + renderxmin,
-                yh,
-                yl
-            );
-        }
-        prevminy[x + renderxmin] = renderminy[x + renderxmin];
-        prevmaxy[x + renderxmin] = rendermaxy[x + renderxmin];
-        TryClip(ceilclip, yh, x + renderxmin);
-        TryClip(floorclip, yl, x + renderxmin);
+        scale += scalestep;
     }
 }
 
 // Clip floating-point X bound to integer bound within range of screen (right side exclusive)
 static uint16_t ClipToScreen(float b) {
-    if (b < -200.0f) {
+    if (b < -SCRNDIST) {
         return 0;
-    } else if (b > 200.0f) {
-        return 400;
+    } else if (b > SCRNDIST) {
+        return SCRNDISTI * 2;
     } else {
-        return (int16_t) floorf(b) + 200;
+        return (int16_t) floorf(b) + SCRNDISTI;
     }
 }
 
@@ -293,7 +298,7 @@ void R_InitWallGlobals(float angle, float eyeheight) {
     memset(prevminy, 0, sizeof(prevminy));
     memset(prevmaxy, LCD_ROWS, sizeof(prevmaxy));
     // Remember eye height.
-    rendereyeheight = floorf(eyeheight);
+    rendereyeheight = R_FloatToFixed(eyeheight);
 }
 
 bool R_DrawWall(const wall_t *wall, float *left, float *right) {
@@ -303,31 +308,31 @@ bool R_DrawWall(const wall_t *wall, float *left, float *right) {
         return false;
     }
 
-    heightceiling = rendereyeheight - rendersector->ceiling;
-    heightfloor = rendereyeheight - rendersector->floor;
+    heightceiling = rendereyeheight - (rendersector->ceiling << FRACBITS);
+    heightfloor = rendereyeheight - (rendersector->floor << FRACBITS);
+    SetColumnOffset(heightceiling, renderwall->midpatch);
+
+    DrawWallColumns(renderwall->midpatch, CLIP_CEIL, CLIP_FLOOR);
+    DrawFlats();
 
     if (renderwall->portal != NULL) {
-        DrawWallColumns(false, CLIP_CEIL, CLIP_FLOOR);
-        DrawFlats();
-
         // If the height of the ceiling goes down, render top wall.
         if (renderwall->portal->ceiling < rendersector->ceiling) {
-            heightceiling = rendereyeheight - rendersector->ceiling;
-            heightfloor = rendereyeheight - renderwall->portal->ceiling;
-            DrawWallColumns(true, CLIP_NONE, CLIP_CEIL);
+            heightfloor = rendereyeheight - (renderwall->portal->ceiling << FRACBITS);
+            SetColumnOffset(heightfloor, renderwall->toppatch);
+            DrawWallColumns(renderwall->toppatch, CLIP_NONE, CLIP_CEIL);
         }
 
         // If the height of the floor goes up, render bottom wall.
         if (renderwall->portal->floor > rendersector->floor) {
-            heightceiling = rendereyeheight - renderwall->portal->floor;
-            heightfloor = rendereyeheight - rendersector->floor;
-            DrawWallColumns(true, CLIP_FLOOR, CLIP_NONE);
+            heightceiling = rendereyeheight - (renderwall->portal->floor << FRACBITS);
+            heightfloor = rendereyeheight - (rendersector->floor << FRACBITS);
+            SetColumnOffset(heightceiling, renderwall->botpatch);
+            DrawWallColumns(renderwall->botpatch, CLIP_FLOOR, CLIP_NONE);
         }
 
         return true;
     } else {
-        DrawWallColumns(true, CLIP_CEIL, CLIP_FLOOR);
-        DrawFlats();
         return false;
     }
 }

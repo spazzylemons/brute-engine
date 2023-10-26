@@ -13,9 +13,6 @@ ifeq ($(SDK),)
 $(error SDK path not found; set ENV value PLAYDATE_SDK_PATH)
 endif
 
-# WADs from which map files are derived
-WADFILE = maps/brute.wad
-
 ######
 # IMPORTANT: You must add your source folders to VPATH for make to find them
 # ex: VPATH += src1:src2
@@ -27,13 +24,14 @@ VPATH += src
 SRC = \
 	src/a_actor.c \
 	src/a_player.c \
-	src/b_core.c \
 	src/b_main.c \
 	src/i_main.c \
+	src/i_memory.c \
 	src/m_iter.c \
 	src/m_load.c \
 	src/m_map.c \
 	src/r_draw.c \
+	src/r_fixed.c \
 	src/r_flat.c \
 	src/r_local.c \
 	src/r_main.c \
@@ -67,12 +65,18 @@ ULIBS =
 
 include $(SDK)/C_API/buildsupport/common.mk
 
+# More aggressive optimizations.
+OPT += -flto=auto -O3 -Wextra
+LDFLAGS += -flto=auto
+
 all: wadextract
 
-wadextract: $(WADFILE)
-	tools/map_converter.py $< Source/
+wadextract:
+	tools/map_converter.py assets/ Source/
 
-clean: mapclean
+clean: assetclean
 
-mapclean:
+assetclean:
+	-rm -rf Source/flats
 	-rm -rf Source/maps
+	-rm -rf Source/patches

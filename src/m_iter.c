@@ -10,7 +10,7 @@ void M_SectorIterNew(sectoriter_t *iter, sector_t *first) {
 }
 
 void M_SectorIterPush(sectoriter_t *iter, sector_t *sector) {
-    if (sector != iter->root && sector->next_seen == NULL) {
+    if (M_SectorCanBePushed(iter, sector)) {
         sector->next_seen = iter->seen;
         iter->seen = sector;
 
@@ -42,4 +42,8 @@ void M_SectorIterCleanup(sectoriter_t *iter) {
         sector->next_seen = NULL;
         sector->next_queue = NULL;
     }
+}
+
+bool M_SectorCanBePushed(sectoriter_t *iter, sector_t *sector) {
+    return sector != iter->root && sector->next_seen == NULL;
 }

@@ -3,10 +3,10 @@
 #include "r_flat.h"
 #include "r_local.h"
 
-static int32_t offx;       // 20.12 fixed point X offset
-static int32_t offy;       // 20.12 fixed point Y offset
-static int32_t flatsine;   // 20.12 fixed point sine angle value
-static int32_t flatcosine; // 20.12 fixed point cosine angle value
+static fixed_t offx;       // X offset
+static fixed_t offy;       // Y offset
+static fixed_t flatsine;   // Sine angle value
+static fixed_t flatcosine; // Cosine angle value
 
 static uint16_t flatleft[LCD_ROWS];
 static uint16_t flatright[LCD_ROWS];
@@ -15,11 +15,11 @@ static uint8_t flatbottom;
 
 void R_InitFlatGlobals(float angle) {
     // Calculate the X and Y offsets.
-    offx = (int32_t) floorf((fmodf(renderpos.x, 64.0f) + 64.0f) * 4096.0f) & 0x3ffff;
-    offy = (int32_t) floorf((fmodf(renderpos.y, 64.0f) + 64.0f) * 4096.0f) & 0x3ffff;
+    offx = R_FloatToFixed(renderpos.x) & ((0x40 << FRACBITS) - 1);
+    offy = R_FloatToFixed(renderpos.y) & ((0x40 << FRACBITS) - 1);
     // Calculate the sine and cosine.
-    flatsine = (int32_t) floorf(sinf(-angle) * SCRNDISTI) << 12;
-    flatcosine = (int32_t) floorf(cosf(-angle) * SCRNDISTI) << 12;
+    flatsine = R_FloatToFixed(SCRNDIST * sinf(-angle));
+    flatcosine = R_FloatToFixed(SCRNDIST * cosf(-angle));
 }
 
 // Get the min and max X bounds.
@@ -51,8 +51,8 @@ static void FindXBounds(const uint8_t *miny, const uint8_t *maxy) {
 
 void R_DrawFlat(const flat_t *flat, const uint8_t *miny, const uint8_t *maxy, int32_t height) {
     FindXBounds(miny, maxy);
-    int32_t heightcos = height * flatcosine;
-    int32_t heightsin = height * flatsine;
+    fixed_t heightcos = R_FixedMul(height, flatcosine);
+    fixed_t heightsin = R_FixedMul(height, flatsine);
     // Set span source.
     ds_source = flat->data;
     // Draw spans.

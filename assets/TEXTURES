@@ -1,0 +1,29 @@
+Texture "WALL", 64, 64
+{
+	Patch "WALL", 0, 0
+}
+
+Texture "PILLAR", 64, 64
+{
+	Patch "PILLAR", 0, 0
+}
+
+Texture "PADDED", 32, 64
+{
+	Patch "PADDED", 0, 0
+}
+
+Texture "WARNTECH", 64, 64
+{
+	Patch "WARNTECH", 0, 0
+}
+
+Texture "FOURCOM1", 64, 64
+{
+	Patch "FOURCOM1", 0, 0
+}
+
+Texture "EXITFRNT", 32, 16
+{
+	Patch "EXITFRNT", 0, 0
+}
