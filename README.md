@@ -11,7 +11,8 @@ prevents needing to adjust relative include directives. The modules are:
 
 - A: Actors
 - B: Brute core module
-- I: Playdate interface module
+- I: Platform interface module
 - M: Map loading and processing
 - R: Rendering
 - U: Utilities (Math, etc.)
+- Z: Memory management

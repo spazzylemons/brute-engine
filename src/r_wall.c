@@ -1,9 +1,12 @@
-#include "b_core.h"
+#include "i_video.h"
 #include "r_draw.h"
 #include "r_flat.h"
 #include "r_local.h"
 #include "r_wall.h"
 #include "u_vec.h"
+
+#include <math.h>
+#include <string.h>
 
 static const wall_t *renderwall; // The current wall.
 static float wallsine;           // Sine multiply for wall rotation.
@@ -28,19 +31,19 @@ typedef enum {
 } cliptype_t;
 
 // Buffer for storing Y pixel coordinate of portal top.
-static uint8_t renderminy[LCD_COLUMNS];
+static uint8_t renderminy[SCREENWIDTH];
 // Buffer for storing Y pixel coordinate of portal bottom.
-static uint8_t rendermaxy[LCD_COLUMNS];
+static uint8_t rendermaxy[SCREENWIDTH];
 // Buffer for storing previous Y pixel top, for flat drawing.
-static uint8_t prevminy[LCD_COLUMNS];
+static uint8_t prevminy[SCREENWIDTH];
 // Buffer for storing previous Y pixel bottom, for flat drawing.
-static uint8_t prevmaxy[LCD_COLUMNS];
+static uint8_t prevmaxy[SCREENWIDTH];
 
 static void TryClip(cliptype_t cliptype, int32_t val, int32_t x) {
     if (val < 0) {
         val = 0;
-    } else if (val > LCD_ROWS) {
-        val = LCD_ROWS;
+    } else if (val > SCREENHEIGHT) {
+        val = SCREENHEIGHT;
     }
 
     switch (cliptype) {
@@ -123,8 +126,8 @@ static void DrawWallColumns(
     // Wall drawing loop.
     for (uint16_t x = renderxmin; x < renderxmax; x++) {
         // Find integer endpoints on screen.
-        int32_t yh = (hfrac >> FRACBITS) + (LCD_ROWS >> 1);
-        int32_t yl = (lfrac >> FRACBITS) + (LCD_ROWS >> 1);
+        int32_t yh = (hfrac >> FRACBITS) + (SCREENHEIGHT >> 1);
+        int32_t yl = (lfrac >> FRACBITS) + (SCREENHEIGHT >> 1);
         // Draw patch if present.
         if (patch != NULL) {
             // Calculate which column to render.
@@ -294,9 +297,9 @@ void R_InitWallGlobals(float angle, float eyeheight) {
     wallcosine = cosf(-angle);
     // Initialize min and max buffers.
     memset(renderminy, 0, sizeof(renderminy));
-    memset(rendermaxy, LCD_ROWS, sizeof(rendermaxy));
+    memset(rendermaxy, SCREENHEIGHT, sizeof(rendermaxy));
     memset(prevminy, 0, sizeof(prevminy));
-    memset(prevmaxy, LCD_ROWS, sizeof(prevmaxy));
+    memset(prevmaxy, SCREENHEIGHT, sizeof(prevmaxy));
     // Remember eye height.
     rendereyeheight = R_FloatToFixed(eyeheight);
 }

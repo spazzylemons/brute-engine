@@ -1,4 +1,4 @@
-#include "b_core.h"
+#include "i_video.h"
 #include "r_draw.h"
 
 // Number of bytes in a framebuffer row.
@@ -58,11 +58,11 @@ static inline void PlotPixel(uint8_t *framebuffer, uint8_t shade, uint8_t mask) 
 }
 
 void R_LoadFramebuffer(void) {
-    renderbuf = playdate->graphics->getFrame();
+    renderbuf = I_GetFramebuffer();
 }
 
 void R_FlushFramebuffer(void) {
-    playdate->graphics->markUpdatedRows(0, LCD_ROWS - 1);
+    I_MarkFramebufferDirty();
 }
 
 void R_DrawColumn(void) {
@@ -74,7 +74,7 @@ void R_DrawColumn(void) {
     const uint8_t *source = dc_source;
     // For speed, use fixed-point accumulator instead of repeated multiply and divide.
     fixed_t fracstep = dc_scale;
-    fixed_t frac = fracstep * (yh - (LCD_ROWS >> 1)) + dc_offset;
+    fixed_t frac = fracstep * (yh - (SCREENHEIGHT >> 1)) + dc_offset;
     // Convert scale to mask.
     uint8_t mask = dc_height - 1;
     for (uint8_t y = yh; y < yl; y++) {

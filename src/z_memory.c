@@ -1,7 +1,8 @@
-#include "b_core.h"
 #include "i_memory.h"
+#include "i_system.h"
 #include "u_error.h"
 #include "u_list.h"
+#include "z_memory.h"
 
 #ifdef DEBUG_ALLOCATOR
 
@@ -28,10 +29,10 @@ static EMPTY_LIST(allocations);
 
 void *Allocate2(size_t size, const char *file, uint32_t line) {
     // Allocate block of memory.
-    allocblock_t *block = playdate->system->realloc(NULL, size + sizeof(allocblock_t));
+    allocblock_t *block = I_Malloc(size + sizeof(allocblock_t));
     // Check if allocation failed.
     if (block == NULL) {
-        Error("%s:%u: Allocation of size %zu failed", file, line, size);
+        Error("%s:%u: Allocation of size %u failed", file, line, size);
     }
     // Fill in data.
     U_ListInsert(&allocations, &block->list);
@@ -57,7 +58,7 @@ void Deallocate2(void *ptr, const char *file, uint32_t line) {
     }
     // Free data.
     U_ListRemove(&block->list);
-    playdate->system->realloc(block, 0);
+    I_Free(block);
 }
 
 void CheckLeaks(void) {
@@ -66,7 +67,7 @@ void CheckLeaks(void) {
     allocblock_t *block;
 
     while ((block = (allocblock_t *) U_ListIterNext(&iter)) != NULL) {
-        playdate->system->logToConsole("%s:%u: %zu bytes leaked", block->file, block->line, block->size);
+        I_Log("%s:%u: %u bytes leaked", block->file, block->line, block->size);
     }
 }
 
@@ -77,7 +78,7 @@ void *Allocate(size_t size) {
         // Don't make empty allocations.
         size = 1;
     }
-    void *result = playdate->system->realloc(NULL, size);
+    void *result = I_Malloc(size);
     if (result == NULL) {
         Error("Allocation of size %u failed.", size);
     }
@@ -87,7 +88,7 @@ void *Allocate(size_t size) {
 void Deallocate(void *ptr) {
     // Don't free NULL.
     if (ptr != NULL) {
-        playdate->system->realloc(ptr, 0);
+        I_Free(ptr);
     }
 }
 

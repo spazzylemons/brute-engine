@@ -1,15 +1,17 @@
-#include "b_core.h"
+#include "i_video.h"
 #include "r_draw.h"
 #include "r_flat.h"
 #include "r_local.h"
+
+#include <math.h>
 
 static fixed_t offx;       // X offset
 static fixed_t offy;       // Y offset
 static fixed_t flatsine;   // Sine angle value
 static fixed_t flatcosine; // Cosine angle value
 
-static uint16_t flatleft[LCD_ROWS];
-static uint16_t flatright[LCD_ROWS];
+static uint16_t flatleft[SCREENHEIGHT];
+static uint16_t flatright[SCREENHEIGHT];
 static uint8_t flattop;
 static uint8_t flatbottom;
 
@@ -25,7 +27,7 @@ void R_InitFlatGlobals(float angle) {
 // Get the min and max X bounds.
 static void FindXBounds(const uint8_t *miny, const uint8_t *maxy) {
     // Where are the min and max Y coordinates?
-    flattop = LCD_ROWS;
+    flattop = SCREENHEIGHT;
     flatbottom = 0;
     for (uint16_t x = renderxmin; x < renderxmax; x++) {
         if (miny[x] < flattop) flattop = miny[x];

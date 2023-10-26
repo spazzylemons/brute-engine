@@ -1,7 +1,9 @@
 #include "a_classes.h"
-#include "b_core.h"
+#include "i_input.h"
 #include "u_error.h"
 #include "u_math.h"
+
+#include <math.h>
 
 // Deadzone in degrees.
 #define DEADZONE 10.0f
@@ -10,8 +12,8 @@
 #define TURNSPEED 0.005f
 
 // Move the player in crank mode.
-static void MovePlayerCrank(actor_t *this, vector_t *delta, PDButtons held) {
-    float crankangle = playdate->system->getCrankAngle();
+static void MovePlayerCrank(actor_t *this, vector_t *delta, buttonmask_t held) {
+    float crankangle = I_GetCrankAngle();
     // Only do crank movement if in left half.
     if (crankangle <= 180.0f) {
         // Deadzone of ten degrees either way.
@@ -26,26 +28,26 @@ static void MovePlayerCrank(actor_t *this, vector_t *delta, PDButtons held) {
         this->angle = U_AngleAdd(this->angle, anglechange);
     }
 
-    if (held & (kButtonLeft | kButtonRight | kButtonUp | kButtonDown)) {
+    if (held & (BTN_L | BTN_R | BTN_U | BTN_D)) {
         // Check which direction we're moving in.
         float moveangle;
-        if (held & kButtonLeft) {
-            if (held & kButtonUp) {
+        if (held & BTN_L) {
+            if (held & BTN_U) {
                 moveangle = DEG_45;
-            } else if (held & kButtonDown) {
+            } else if (held & BTN_D) {
                 moveangle = DEG_135;
             } else {
                 moveangle = DEG_90;
             }
-        } else if (held & kButtonRight) {
-            if (held & kButtonUp) {
+        } else if (held & BTN_R) {
+            if (held & BTN_U) {
                 moveangle = DEG_315;
-            } else if (held & kButtonDown) {
+            } else if (held & BTN_D) {
                 moveangle = DEG_225;
             } else {
                 moveangle = DEG_270;
             }
-        } else if (held & kButtonUp) {
+        } else if (held & BTN_U) {
             moveangle = DEG_0;
         } else {
             moveangle = DEG_180;
@@ -62,18 +64,18 @@ static void MovePlayerCrank(actor_t *this, vector_t *delta, PDButtons held) {
 }
 
 // Move the player in D-pad only mode.
-static void MovePlayerDPad(actor_t *this, vector_t *delta, PDButtons held) {
+static void MovePlayerDPad(actor_t *this, vector_t *delta, buttonmask_t held) {
     // Check turning.
-    if (held & kButtonLeft) {
+    if (held & BTN_L) {
         this->angle = U_AngleAdd(this->angle, 0.05f);
-    } else if (held & kButtonRight) {
+    } else if (held & BTN_R) {
         this->angle = U_AngleAdd(this->angle, -0.05f);
     }
 
-    if (held & kButtonUp) {
+    if (held & BTN_U) {
         delta->x = -sinf(this->angle) * 6.0f;
         delta->y = cosf(this->angle) * 6.0f;
-    } else if (held & kButtonDown) {
+    } else if (held & BTN_D) {
         delta->x = sinf(this->angle) * 6.0f;
         delta->y = -cosf(this->angle) * 6.0f;
     } else {
@@ -83,12 +85,11 @@ static void MovePlayerDPad(actor_t *this, vector_t *delta, PDButtons held) {
 }
 
 static void Update(actor_t *this) {
-    PDButtons held;
-    playdate->system->getButtonState(&held, NULL, NULL);
+    buttonmask_t held = I_GetHeldButtons();
 
     // Check crank state and move according to crank.
     vector_t delta;
-    if (playdate->system->isCrankDocked()) {
+    if (I_IsCrankDocked()) {
         MovePlayerDPad(this, &delta, held);
     } else {
         MovePlayerCrank(this, &delta, held);

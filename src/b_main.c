@@ -1,5 +1,5 @@
 #include "a_classes.h"
-#include "b_core.h"
+#include "i_video.h"
 #include "m_load.h"
 #include "r_main.h"
 
@@ -17,7 +17,7 @@ void B_MainInit(void) {
 void B_MainLoop(void) {
     A_ActorUpdate();
     R_RenderViewpoint(player);
-    playdate->system->drawFPS(0, 0);
+    I_DrawFPS();
 }
 
 void B_MainQuit(void) {

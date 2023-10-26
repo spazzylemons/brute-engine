@@ -1,21 +1,18 @@
-#include "b_core.h"
-#include "i_memory.h"
+#include "i_file.h"
 #include "u_error.h"
 #include "u_file.h"
+#include "z_memory.h"
 
 void *U_FileRead(const char *path, size_t *size) {
     // Open the file.
-    SDFile *file = playdate->file->open(path, kFileRead | kFileReadData);
+    file_t *file = I_FileOpen(path, OPEN_RD);
     if (file == NULL) {
         Error("U_FileRead: File '%s' could not be opened", path);
     }
     // Get the size of the file.
-    int sizeval;
-    if (playdate->file->seek(file, 0, SEEK_END) ||
-        (sizeval = playdate->file->tell(file)) < 0 ||
-        playdate->file->seek(file, 0, SEEK_SET)) {
-        Error("U_FileRead: Failed to get size of file '%s'", path);
-    }
+    I_FileSeek(file, 0, SEEK_END);
+    uint32_t sizeval = I_FileTell(file);
+    I_FileSeek(file, 0, SEEK_SET);
     // Check max file size.
     if (sizeval > MAXFILESIZE) {
         Error("U_FileRead: File '%s' is too large", path);
@@ -23,11 +20,11 @@ void *U_FileRead(const char *path, size_t *size) {
     // Allocate the buffer.
     void *buffer = Allocate(sizeval);
     // Read into the buffer.
-    if (playdate->file->read(file, buffer, sizeval) != sizeval) {
+    if (I_FileRead(file, buffer, sizeval) != sizeval) {
         Error("U_FileRead: Failed to read entire file '%s'", path);
     }
     // Close the file.
-    playdate->file->close(file);
+    I_FileClose(file);
     // Write size if requested.
     if (size != NULL) {
         *size = sizeval;

@@ -1,4 +1,4 @@
-#include "b_core.h"
+#include "i_time.h"
 #include "r_draw.h"
 #include "r_flat.h"
 #include "r_local.h"
@@ -7,10 +7,12 @@
 #include "r_wall.h"
 #include "u_math.h"
 
+#include <math.h>
+
 // Calculate view bobbing.
 static float ViewBobbing(const actor_t *actor) {
     // Calculate where in animation we are.
-    float animangle = (playdate->system->getCurrentTimeMilliseconds() & 511) * (TAU / 512.0f);
+    float animangle = (I_GetMillis() & 511) * (TAU / 512.0f);
     // Figure out the intensity of view bobbing.
     float mag = U_VecLenSq(&actor->vel) * 0.1f;
     return cosf(animangle) * mag;

@@ -25,8 +25,7 @@ SRC = \
 	src/a_actor.c \
 	src/a_player.c \
 	src/b_main.c \
-	src/i_main.c \
-	src/i_memory.c \
+	src/i_playdate.c \
 	src/m_iter.c \
 	src/m_load.c \
 	src/m_map.c \
@@ -43,7 +42,8 @@ SRC = \
 	src/u_format.c \
 	src/u_list.c \
 	src/u_math.c \
-	src/u_vec.c
+	src/u_vec.c \
+	src/z_memory.c
 
 # List all user directories here
 UINCDIR = 

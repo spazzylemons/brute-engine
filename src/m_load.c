@@ -1,10 +1,12 @@
-#include "b_core.h"
-#include "i_memory.h"
 #include "m_load.h"
 #include "u_error.h"
 #include "u_file.h"
 #include "u_format.h"
 #include "u_vec.h"
+#include "z_memory.h"
+
+#include <math.h>
+#include <string.h>
 
 // Just in case, we'll pack the structs we read from the files.
 #define PACKED __attribute__((__packed__))

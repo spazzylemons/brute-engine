@@ -1,7 +1,7 @@
 #include "a_actor.h"
-#include "i_memory.h"
 #include "m_iter.h"
 #include "m_map.h"
+#include "z_memory.h"
 
 #include <math.h>
 
