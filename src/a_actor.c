@@ -70,11 +70,10 @@ void A_ActorApplyVelocity(actor_t *this) {
 void A_ActorApplyGravity(actor_t *this) {
     this->zpos += this->zvel;
     // Climb up smoothly if lower than floor.
-    sectoriter_t iter;
-    M_SectorIterNew(&iter, this->sector);
+    M_SectorIterInit(this->sector);
     sector_t *sector;
     float target_zpos = -INFINITY;
-    while ((sector = M_SectorIterPop(&iter)) != NULL) {
+    while ((sector = M_SectorIterPop()) != NULL) {
         if (sector->floor > target_zpos && sector->floor < this->zpos + MAX_STAIR_HEIGHT) {
             target_zpos = sector->floor;
         }
@@ -82,13 +81,13 @@ void A_ActorApplyGravity(actor_t *this) {
         for (size_t i = 0; i < sector->num_walls; i++) {
             const wall_t *wall = &sector->walls[i];
             if (wall->portal != NULL && 
-                M_SectorCanBePushed(&iter, wall->portal) &&
+                M_SectorCanBePushed(wall->portal) &&
                 M_SectorContainsCircle(wall->portal, &this->pos, OBJ_RADIUS)) {
-                M_SectorIterPush(&iter, wall->portal);
+                M_SectorIterPush(wall->portal);
             }
         }
     }
-    M_SectorIterCleanup(&iter);
+    M_SectorIterCleanup();
     if (this->zpos <= target_zpos) {
         this->zvel = 0.0f;
         if (this->zpos < target_zpos) {

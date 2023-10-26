@@ -35,14 +35,14 @@ bool M_SectorContainsCircle(const sector_t *sector, const vector_t *point, float
 }
 
 static sector_t *FindPlayerSector(sector_t *sector, const vector_t *point) {
-    sectoriter_t iter;
-    M_SectorIterNew(&iter, sector);
+    sector_t *root = sector;
+    M_SectorIterInit(sector);
 
     // Iterate until we find a sector that contains the player in its walls.
-    while ((sector = M_SectorIterPop(&iter))) {
+    while ((sector = M_SectorIterPop())) {
         if (M_SectorContainsPoint(sector, point)) {
             // This sector contains our point.
-            M_SectorIterCleanup(&iter);
+            M_SectorIterCleanup();
             return sector;
         }
 
@@ -50,15 +50,15 @@ static sector_t *FindPlayerSector(sector_t *sector, const vector_t *point) {
         for (size_t i = 0; i < sector->num_walls; i++) {
             const wall_t *wall = &sector->walls[i];
             if (wall->portal != NULL) {
-                M_SectorIterPush(&iter, wall->portal);
+                M_SectorIterPush(wall->portal);
             }
         }
     }
 
     // Somehow the player isn't in any sector. As a failsafe, we'll return the
     // sector they were last seen in.
-    M_SectorIterCleanup(&iter);
-    return iter.root;
+    M_SectorIterCleanup();
+    return root;
 }
 
 static float GetCollisionTime(
@@ -128,8 +128,7 @@ static const wall_t *SectorCollide(
     const wall_t *closest = NULL;
     float closest_distance = INFINITY;
 
-    sectoriter_t iter;
-    M_SectorIterNew(&iter, sector);
+    M_SectorIterInit(sector);
 
     // AABB of the player.
     aabb_t player_bounds;
@@ -150,7 +149,7 @@ static const wall_t *SectorCollide(
         player_bounds.min.y += delta->y;
     }
 
-    while ((sector = M_SectorIterPop(&iter)) != NULL) {
+    while ((sector = M_SectorIterPop()) != NULL) {
         for (size_t i = 0; i < sector->num_walls; i++) {
             const wall_t *wall = &sector->walls[i];
 
@@ -158,7 +157,7 @@ static const wall_t *SectorCollide(
             // add it to the queue of portals to check.
             if (wall->portal != NULL) {
                 if (AABBOverlap(&player_bounds, &wall->portal->bounds)) {
-                    M_SectorIterPush(&iter, wall->portal);
+                    M_SectorIterPush(wall->portal);
                 }
 
                 // If we don't collide with the lower or upper parts of the portal,
@@ -196,7 +195,7 @@ static const wall_t *SectorCollide(
         U_VecScaledAdd(delta, &slide, (1.0f - closest_distance) * slidefac);
     }
 
-    M_SectorIterCleanup(&iter);
+    M_SectorIterCleanup();
 
     return closest;
 }
