@@ -67,7 +67,7 @@ static char pathbuf[64];
 
 static void *ReadMapFile(const char *name, const char *file, size_t *szp, size_t mbsz) {
     // Format map path.
-    FormatString(pathbuf, sizeof(pathbuf), "/maps/%s/%s", name, file);
+    FormatString(pathbuf, sizeof(pathbuf), "maps/%s/%s", name, file);
     // Read file.
     void *result = U_FileRead(pathbuf, szp);
     // Divide size by member count.
@@ -114,7 +114,7 @@ static void LoadPatches(const char *name, map_t *map) {
         memset(patchname, 0, sizeof(patchname));
         strncpy(patchname, &fpatches[8 * i], 8);
         // Load patch from file.
-        FormatString(pathbuf, sizeof(pathbuf), "/patches/%s", patchname);
+        FormatString(pathbuf, sizeof(pathbuf), "patches/%s", patchname);
         LoadPatch(&map->patches[i], pathbuf);
     }
     // Free file data.
@@ -144,7 +144,7 @@ static void LoadFlats(const char *name, map_t *map) {
         memset(flatname, 0, sizeof(flatname));
         strncpy(flatname, &fflats[8 * i], 8);
         // Load patch from file.
-        FormatString(pathbuf, sizeof(pathbuf), "/flats/%s", flatname);
+        FormatString(pathbuf, sizeof(pathbuf), "flats/%s", flatname);
         LoadFlat(&map->flats[i], pathbuf);
     }
     // Free file data.

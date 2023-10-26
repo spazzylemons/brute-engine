@@ -1,5 +1,7 @@
 /.vscode
 /build
+/buildsdl
+/brute
 /*.pdx
 /Source/pdex.*
 /Source/maps

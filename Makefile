@@ -1,82 +1,25 @@
-HEAP_SIZE      = 8388208
-STACK_SIZE     = 61800
+# This Makefile delegates to other Makefiles depending on the target.
 
-PRODUCT = Brute.pdx
+.PHONY: all sdl playdate clean
 
-# Locate the SDK
-SDK = ${PLAYDATE_SDK_PATH}
-ifeq ($(SDK),)
-	SDK = $(shell egrep '^\s*SDKRoot' ~/.Playdate/config | head -n 1 | cut -c9-)
+# Attempt to get the processor count for multithreaded compilation.
+PROC_COUNT := $(shell nproc)
+ifeq ($(PROC_COUNT),)
+# looks like we don't have nproc...
+PROC_COUNT := 1
 endif
 
-ifeq ($(SDK),)
-$(error SDK path not found; set ENV value PLAYDATE_SDK_PATH)
-endif
+# The first recipe is the default. here we make it fail so you are required to
+# specify a target.
+all:
+	$(error "Please specify a target with 'make sdl' or 'make playdate'.")
 
-######
-# IMPORTANT: You must add your source folders to VPATH for make to find them
-# ex: VPATH += src1:src2
-######
+sdl:
+	$(MAKE) -f Makefile.sdl -j$(PROC_COUNT)
 
-VPATH += src
+playdate:
+	$(MAKE) -f Makefile.playdate -j$(PROC_COUNT)
 
-# List C source files here
-SRC = \
-	src/a_actor.c \
-	src/a_player.c \
-	src/b_main.c \
-	src/i_playdate.c \
-	src/m_iter.c \
-	src/m_load.c \
-	src/m_map.c \
-	src/r_draw.c \
-	src/r_fixed.c \
-	src/r_flat.c \
-	src/r_local.c \
-	src/r_main.c \
-	src/r_sector.c \
-	src/r_wall.c \
-	src/u_aabb.c \
-	src/u_error.c \
-	src/u_file.c \
-	src/u_format.c \
-	src/u_list.c \
-	src/u_math.c \
-	src/u_vec.c \
-	src/z_memory.c
-
-# List all user directories here
-UINCDIR = 
-
-# List user asm files
-UASRC = 
-
-# List all user C define here, like -D_DEBUG=1
-UDEFS = 
-
-# Define ASM defines here
-UADEFS = 
-
-# List the user directory to look for the libraries here
-ULIBDIR =
-
-# List all user libraries here
-ULIBS =
-
-include $(SDK)/C_API/buildsupport/common.mk
-
-# More aggressive optimizations.
-OPT += -flto=auto -O3 -Wextra
-LDFLAGS += -flto=auto
-
-all: wadextract
-
-wadextract:
-	tools/map_converter.py assets/ Source/
-
-clean: assetclean
-
-assetclean:
-	-rm -rf Source/flats
-	-rm -rf Source/maps
-	-rm -rf Source/patches
+clean:
+	$(MAKE) -f Makefile.sdl clean
+	$(MAKE) -f Makefile.playdate clean
