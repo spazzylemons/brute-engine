@@ -28,4 +28,4 @@ clean:
 	-rm -rf Source/patches
 
 assetextract:
-	tools/map_converter.py assets/ Source/
+	tools/map_converter.py assets/ Source/assets.bin

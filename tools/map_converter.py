@@ -11,6 +11,8 @@ import re
 import struct
 import sys
 
+from pack import Branch, Lump
+
 from PIL import Image
 
 UNQUOTE = re.compile(r'\\(.)')
@@ -94,7 +96,7 @@ if len(sys.argv) != 3:
     print('usage: {} <input PWAD> <output folder>'.format(sys.argv[0]), file=sys.stderr)
     exit(1)
 
-def handle_udmf(content, mapname):
+def handle_udmf(content, mapname) -> Branch:
     udmf = content.decode()
     # Parse UDMF.
     mapdata = UdmfVisitor().visit(udmf_grammar.parse(udmf))
@@ -193,18 +195,13 @@ def handle_udmf(content, mapname):
     #         print(r'\right)', end='')
     #     print(r'\right)')
     # Commit to files.
-    mappath = sys.argv[2] + '/maps/' + mapname.lower()
-    os.makedirs(mappath, exist_ok=True)
-    with open(mappath + '/vertices', 'wb') as file:
-        file.write(out_vertices)
-    with open(mappath + '/sectors', 'wb') as file:
-        file.write(out_sectors)
-    with open(mappath + '/walls', 'wb') as file:
-        file.write(out_walls)
-    with open(mappath + '/patches', 'wb') as file:
-        file.write(out_patches)
-    with open(mappath + '/flats', 'wb') as file:
-        file.write(out_flats)
+    result = Branch(mapname.lower())
+    result.children.append(Lump('vertices', out_vertices))
+    result.children.append(Lump('sectors', out_sectors))
+    result.children.append(Lump('walls', out_walls))
+    result.children.append(Lump('patches', out_patches))
+    result.children.append(Lump('flats', out_flats))
+    return result
 
 def read_image(filepath):
     img = Image.open(filepath)
@@ -215,7 +212,7 @@ def read_image(filepath):
             result[(y * width) + x] = PALETTE_CONV.index(img.getpixel((x, y)))
     return width, height, result
 
-def write_patch(filepath, name):
+def write_patch(filepath, name) -> Lump:
     width, height, pixels = read_image(filepath)
     assert width >= 1 and width < 65536
     assert height >= 1 and height < 65536
@@ -225,40 +222,37 @@ def write_patch(filepath, name):
     for x in range(width):
         for y in range(height):
             result.append(pixels[(width * y) + x])
-    patchpath = sys.argv[2] + '/patches/'
-    os.makedirs(patchpath, exist_ok=True)
-    with open(patchpath + '/' + name.lower(), 'wb') as file:
-        file.write(result)
+    return Lump(name.lower(), result)
 
-def write_flat(filepath, name):
+def write_flat(filepath, name) -> Lump:
     width, height, pixels = read_image(filepath)
     assert width == 64 and height == 64
-    flatpath = sys.argv[2] + '/flats/'
-    os.makedirs(flatpath, exist_ok=True)
-    with open(flatpath + '/' + name.lower(), 'wb') as file:
-        file.write(pixels)
+    return Lump(name.lower(), pixels)
 
 # Game assets are stored in GZDoom directory format before being converted to
 # custom formats for our engine.
 
 # Convert flats.
 src_flatdir = sys.argv[1] + '/flats'
+flatsbranch = Branch('flats')
 for filename in os.listdir(src_flatdir):
     # Get output name.
     name, _ = os.path.splitext(filename)
     name = name.lower()
     # Load PNG.
-    write_flat(src_flatdir + '/' + filename, name)
+    flatsbranch.children.append(write_flat(src_flatdir + '/' + filename, name))
 # Convert patches.
 src_patchdir = sys.argv[1] + '/patches'
+patchesbranch = Branch('patches')
 for filename in os.listdir(src_patchdir):
     # Get output name.
     name, _ = os.path.splitext(filename)
     name = name.lower()
     # Load PNG.
-    write_patch(src_patchdir + '/' + filename, name)
+    patchesbranch.children.append(write_patch(src_patchdir + '/' + filename, name))
 # Convert maps.
 src_mapdir = sys.argv[1] + '/maps'
+mapbranch = Branch('maps')
 for filename in os.listdir(src_mapdir):
     mapname, _ = os.path.splitext(filename)
     mapname = mapname.lower()
@@ -278,4 +272,10 @@ for filename in os.listdir(src_mapdir):
             name = name.decode()
             if name == 'TEXTMAP':
                 wadfile.seek(filepos, io.SEEK_SET)
-                handle_udmf(wadfile.read(size), mapname)
+                mapbranch.children.append(handle_udmf(wadfile.read(size), mapname))
+root = Branch('')
+root.children.append(flatsbranch)
+root.children.append(patchesbranch)
+root.children.append(mapbranch)
+with open(sys.argv[2], 'wb') as file:
+    file.write(root.serialize())

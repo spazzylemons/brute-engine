@@ -29,6 +29,7 @@ CFILES := \
 	src/u_list.c \
 	src/u_math.c \
 	src/u_vec.c \
+	src/w_pack.c \
 	src/y_log.c \
 	src/z_memory.c
 
