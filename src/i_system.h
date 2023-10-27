@@ -6,6 +6,6 @@
  */
 
 // Log a string to the console, followed by a line feed.
-void I_Log(const char *fmt, ...);
+void I_Log(const char *string);
 
 #endif

@@ -15,4 +15,5 @@ prevents needing to adjust relative include directives. The modules are:
 - M: Map loading and processing
 - R: Rendering
 - U: Utilities (Math, etc.)
+- Y: Logging
 - Z: Memory management

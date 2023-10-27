@@ -1,7 +1,7 @@
-#include "i_system.h"
 #include "i_video.h"
 #include "u_error.h"
 #include "u_format.h"
+#include "y_log.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -118,6 +118,7 @@ static void DrawMessage(const char *message) {
             ++x;
         } while (--width);
     }
+    I_MarkFramebufferDirty();
 }
 
 void DisplayError(void) {
@@ -133,7 +134,7 @@ noreturn void Error(const char *fmt, ...) {
 
     // Log the message in the console as well, in case the application
     // terminates before we can see it.
-    I_Log("%s", errorbuf);
+    Y_Log("%s", errorbuf);
 
     __builtin_longjmp(jumpbuffer, 1);
 }

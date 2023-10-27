@@ -73,12 +73,8 @@ void I_Free(void *ptr) {
     free(ptr);
 }
 
-void I_Log(const char *fmt, ...) {
-    // TODO this code should be reworked.
-    va_list list;
-    va_start(list, fmt);
-    vprintf(fmt, list);
-    va_end(list);
+void I_Log(const char *string) {
+    printf("%s\n", string);
 }
 
 uint32_t I_GetMillis(void) {

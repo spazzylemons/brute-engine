@@ -1,7 +1,7 @@
 #include "i_memory.h"
-#include "i_system.h"
 #include "u_error.h"
 #include "u_list.h"
+#include "y_log.h"
 #include "z_memory.h"
 
 #ifdef DEBUG_ALLOCATOR
@@ -67,7 +67,7 @@ void CheckLeaks(void) {
     allocblock_t *block;
 
     while ((block = (allocblock_t *) U_ListIterNext(&iter)) != NULL) {
-        I_Log("%s:%u: %u bytes leaked", block->file, block->line, block->size);
+        Y_Log("%s:%u: %u bytes leaked", block->file, block->line, block->size);
     }
 }
 
