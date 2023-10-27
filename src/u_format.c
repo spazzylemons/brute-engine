@@ -17,7 +17,6 @@ static char *FormatUnsignedInt(char *buf, char *end, unsigned int value) {
     } while (value != 0);
     // Print reversed buffer in reverse.
     while (bufidx > 0) {
-        int foo = intbuf[bufidx - 1];
         WRITE_CHAR(intbuf[--bufidx]);
     }
 quit:

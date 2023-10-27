@@ -31,26 +31,26 @@ file_t *I_FileOpen(const char *path, openmode_t mode) {
             return NULL;
     }
 
-    return fopen(path, modestr);
+    return (file_t *) fopen(path, modestr);
 }
 
 void I_FileClose(file_t *file) {
-    fclose(file);
+    fclose((FILE *) file);
 }
 
 void I_FileSeek(file_t *file, int32_t amt, int whence) {
-    if (fseek(file, amt, whence) < 0) {
+    if (fseek((FILE *) file, amt, whence) < 0) {
         Error("I_FileSeek failed");
     }
 }
 
 uint32_t I_FileTell(file_t *file) {
     // TODO overflow protection
-    return ftell(file);
+    return ftell((FILE *) file);
 }
 
 uint32_t I_FileRead(file_t *file, void *buffer, uint32_t size) {
-    return fread(buffer, 1, size, file);
+    return fread(buffer, 1, size, (FILE *) file);
 }
 
 buttonmask_t I_GetHeldButtons(void) {
