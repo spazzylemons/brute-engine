@@ -69,15 +69,3 @@ include $(SDK)/C_API/buildsupport/common.mk
 # More aggressive optimizations.
 OPT += -flto=auto -O3 -Wextra
 LDFLAGS += -flto=auto
-
-all: wadextract
-
-wadextract:
-	tools/map_converter.py assets/ Source/
-
-clean: assetclean
-
-assetclean:
-	-rm -rf Source/flats
-	-rm -rf Source/maps
-	-rm -rf Source/patches

@@ -14,12 +14,18 @@ endif
 all:
 	$(error "Please specify a target with 'make sdl' or 'make playdate'.")
 
-sdl:
+sdl: assetextract
 	$(MAKE) -f Makefile.sdl -j$(PROC_COUNT)
 
-playdate:
+playdate: assetextract
 	$(MAKE) -f Makefile.playdate -j$(PROC_COUNT)
 
 clean:
 	$(MAKE) -f Makefile.sdl clean
 	$(MAKE) -f Makefile.playdate clean
+	-rm -rf Source/flats
+	-rm -rf Source/maps
+	-rm -rf Source/patches
+
+assetextract:
+	tools/map_converter.py assets/ Source/
