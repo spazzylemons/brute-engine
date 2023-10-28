@@ -180,15 +180,13 @@ static const wall_t *SectorCollide(
             }
         }
     }
-
     // Check the closest wall collision.
     if (closest != NULL) {
         // We hit the wall. Move position to touch wall.
         U_VecScaledAdd(pos, delta, closest_distance);
         // Do wall sliding.
         vector_t slide;
-        U_VecCopy(&slide, closest->v2);
-        U_VecSub(&slide, closest->v1);
+        U_VecCopy(&slide, &closest->delta);
         U_VecNormalize(&slide);
         float slidefac = U_VecDot(&slide, delta);
         U_VecScale(delta, closest_distance);
@@ -214,6 +212,8 @@ sector_t *M_MoveAndSlide(
         const wall_t *wall = SectorCollide(pos, zpos, delta, sector);
         if (wall != NULL) {
             if (wall->portal == NULL && U_VecDistSq(delta, &old_delta) < 0.001f) {
+                U_VecAdd(pos, delta);
+                sector = FindPlayerSector(sector, pos);
                 break;
             }
             sector = FindPlayerSector(sector, pos);
