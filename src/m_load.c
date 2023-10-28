@@ -142,7 +142,6 @@ static void LoadFlat(flat_t *flat, const char *name) {
 }
 
 static void LoadFlats(uint32_t branch, map_t *map) {
-    uint32_t flatsbranch = W_GetNumByName(ROOTID, "flats");
     char *fflats = ReadMapFile(branch, "flats", &map->numflats, sizeof(char[8]));
     // Each 8 bytes is a patch name.
     map->flats = Allocate(sizeof(flat_t) * map->numflats);
