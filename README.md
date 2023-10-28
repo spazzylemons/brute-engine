@@ -1,13 +1,11 @@
 # Brute
 
-First-person 3D game for Playdate.
+First-person 3D game for Playdate, PC, and web.
 
 ## Code structure
 
-The C engine is all in one directory, with each file and public symbol prefixed
-according to its module. This makes finding symbols easier without even needing
-to look them up, and keeps related code together in alphabetical order. It also
-prevents needing to adjust relative include directives. The modules are:
+The C engine is in one directory, with files and most functions prefixed by
+module. Code organization is a constant work-in-progress.
 
 - A: Actors
 - B: Brute core module
