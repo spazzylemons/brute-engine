@@ -211,11 +211,6 @@ sector_t *M_MoveAndSlide(
         U_VecCopy(&old_delta, delta);
         const wall_t *wall = SectorCollide(pos, zpos, delta, sector);
         if (wall != NULL) {
-            if (wall->portal == NULL && U_VecDistSq(delta, &old_delta) < 0.001f) {
-                U_VecAdd(pos, delta);
-                sector = FindPlayerSector(sector, pos);
-                break;
-            }
             sector = FindPlayerSector(sector, pos);
         } else {
             U_VecAdd(pos, delta);
