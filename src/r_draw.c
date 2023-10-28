@@ -4,6 +4,9 @@
 // Number of bytes in a framebuffer row.
 #define ROWSTRIDE 52
 
+// Mask for iterating flat steps.
+#define FLATMASK ((63 << FRACBITS) | ((1 << FRACBITS) - 1))
+
 // Framebuffer.
 static uint8_t *__attribute__((aligned(4))) renderbuf;
 
@@ -99,20 +102,20 @@ void R_DrawSpan(void) {
     // Copy variables.
     fixed_t fracstepx = ds_xstep;
     fixed_t fracstepy = ds_ystep;
-    fixed_t fracx = ds_xfrac;
-    fixed_t fracy = ds_yfrac;
+    fixed_t fracx = ds_xfrac & FLATMASK;
+    fixed_t fracy = ds_yfrac & FLATMASK;
     y &= 3;
     for (uint16_t x = x1; x < x2; x++) {
         // Calculate index.
-        uint8_t newx = (fracx >> FRACBITS) & 63;
-        uint8_t newy = (fracy >> FRACBITS) & 63;
-        uint16_t flatindex = newx + (newy << 6);
+        uint8_t newx = fracx >> FRACBITS;
+        uint8_t newy = fracy >> FRACBITS;
+        uint16_t index = newx | (newy << 6);
         // Plot pixel.
-        uint8_t pixel = source[flatindex];
+        uint8_t pixel = source[index];
         PlotPixel(framebuffer, drawshades[pixel][y], xmask);
         // Advance fractional steps.
-        fracx += fracstepx;
-        fracy += fracstepy;
+        fracx = (fracx + fracstepx) & FLATMASK;
+        fracy = (fracy + fracstepy) & FLATMASK;
         // Move to next pixel.
         xmask >>= 1;
         if (xmask == 0) {
