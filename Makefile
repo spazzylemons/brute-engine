@@ -1,6 +1,6 @@
 # This Makefile delegates to other Makefiles depending on the target.
 
-.PHONY: all emscripten playdate sdl clean
+.PHONY: all emscripten playdate sdl clean assetextract
 
 # Attempt to get the processor count for multithreaded compilation.
 PROC_COUNT := $(shell nproc)
@@ -12,7 +12,7 @@ endif
 # The first recipe is the default. here we make it fail so you are required to
 # specify a target.
 all:
-	$(error "Please specify a target.")
+	$(error "Please specify a target: 'make emscripten', 'make playdate', or 'make sdl'")
 
 emscripten: assetextract
 	$(MAKE) -f Makefile.emscripten -j$(PROC_COUNT)
