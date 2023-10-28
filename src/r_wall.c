@@ -316,6 +316,9 @@ bool R_DrawWall(const wall_t *wall, float *left, float *right) {
     SetColumnOffset(heightceiling, renderwall->midpatch);
 
     DrawWallColumns(renderwall->midpatch, CLIP_CEIL, CLIP_FLOOR);
+    // TODO - maybe we could render faster if flats are drawn per-sector instead
+    // of per-wall. I tried this with a quick memcpy hack but it turned out
+    // slower. Maybe there's a better way?
     DrawFlats();
 
     if (renderwall->portal != NULL) {
