@@ -12,9 +12,10 @@ extern intptr_t jumpbuffer[5];
 noreturn void Error(const char *fmt, ...);
 
 // If this returns nonzero, then an error has occurred.
+#ifdef __EMSCRIPTEN__
+#define CatchError() 0
+#else
 #define CatchError() __builtin_setjmp(jumpbuffer)
-
-// Display the error. Should not be called if no error has occurred.
-void DisplayError(void);
+#endif
 
 #endif

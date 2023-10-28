@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#define ERRPREFIX "Fatal error: "
+
 static char errorbuf[256];
 
 intptr_t jumpbuffer[5];
@@ -121,20 +123,23 @@ static void DrawMessage(const char *message) {
     I_MarkFramebufferDirty();
 }
 
-void DisplayError(void) {
-    // Draw error text.
-    DrawMessage(errorbuf);
-}
-
 noreturn void Error(const char *fmt, ...) {
+    // Add text to the error buffer indicating that it's an error.
+    strcpy(errorbuf, ERRPREFIX);
+    // Print the error message to the remaining part of the buffer.
     va_list list;
     va_start(list, fmt);
-    FormatStringV(errorbuf, sizeof(errorbuf), fmt, list);
+    FormatStringV(errorbuf + strlen(ERRPREFIX), sizeof(errorbuf) - strlen(ERRPREFIX), fmt, list);
     va_end(list);
-
+    // Draw error text.
+    DrawMessage(errorbuf);
     // Log the message in the console as well, in case the application
     // terminates before we can see it.
     Y_Log("%s", errorbuf);
-
+#ifdef __EMSCRIPTEN__
+    // Raise a trap as nonlocal gotos are not yet in WebAssembly.
+    __builtin_unreachable();
+#else
     __builtin_longjmp(jumpbuffer, 1);
+#endif
 }

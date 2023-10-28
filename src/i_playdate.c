@@ -50,12 +50,29 @@ buttonmask_t I_GetHeldButtons(void) {
     return (buttonmask_t) buttons;
 }
 
-float I_GetCrankAngle(void) {
-    return playdate->system->getCrankAngle();
+// Deadzone in degrees.
+#define DEADZONE 10.0f
+
+float I_GetAnalogStrength(void) {
+    float crankangle = playdate->system->getCrankAngle();
+    if (crankangle <= 180.0f) {
+        // Deadzone of ten degrees either way.
+        float anglechange;
+        if (crankangle < 90.0f - DEADZONE) {
+            anglechange = (90.0f - DEADZONE) - crankangle;
+        } else if (crankangle > 90.0f + DEADZONE) {
+            anglechange = (90.0f + DEADZONE) - crankangle;
+        } else {
+            anglechange = 0.0f;
+        }
+        return anglechange;
+    } else {
+        return 0.0f;
+    }
 }
 
-bool I_IsCrankDocked(void) {
-    return playdate->system->isCrankDocked();
+bool I_HasAnalogInput(void) {
+    return !playdate->system->isCrankDocked();
 }
 
 void *I_Malloc(size_t size) {
@@ -102,7 +119,6 @@ static int update(void *userdata) {
 
     if (CatchError()) {
         haderror = true;
-        DisplayError();
     } else {
         B_MainLoop();
     }
@@ -122,7 +138,6 @@ int eventHandler(PlaydateAPI *pd, PDSystemEvent event, uint32_t arg) {
             playdate->system->setUpdateCallback(update, NULL);
             if (CatchError()) {
                 haderror = true;
-                DisplayError();
             } else {
                 B_MainInit();
             }

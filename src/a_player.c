@@ -5,28 +5,12 @@
 
 #include <math.h>
 
-// Deadzone in degrees.
-#define DEADZONE 10.0f
-
 // Turn speed multiplier.
 #define TURNSPEED 0.005f
 
 // Move the player in crank mode.
 static void MovePlayerCrank(actor_t *this, vector_t *delta, buttonmask_t held) {
-    float crankangle = I_GetCrankAngle();
-    // Only do crank movement if in left half.
-    if (crankangle <= 180.0f) {
-        // Deadzone of ten degrees either way.
-        float anglechange;
-        if (crankangle < 90.0f - DEADZONE) {
-            anglechange = ((90.0f - DEADZONE) - crankangle) * TURNSPEED;
-        } else if (crankangle > 90.0f + DEADZONE) {
-            anglechange = ((90.0f + DEADZONE) - crankangle) * TURNSPEED;
-        } else {
-            anglechange = 0.0f;
-        }
-        this->angle = U_AngleAdd(this->angle, anglechange);
-    }
+    this->angle = U_AngleAdd(this->angle, I_GetAnalogStrength() * TURNSPEED);
 
     if (held & (BTN_L | BTN_R | BTN_U | BTN_D)) {
         // Check which direction we're moving in.
@@ -89,10 +73,10 @@ static void Update(actor_t *this) {
 
     // Check crank state and move according to crank.
     vector_t delta;
-    if (I_IsCrankDocked()) {
-        MovePlayerDPad(this, &delta, held);
-    } else {
+    if (I_HasAnalogInput()) {
         MovePlayerCrank(this, &delta, held);
+    } else {
+        MovePlayerDPad(this, &delta, held);
     }
 
     // Gradually approach target velocity.

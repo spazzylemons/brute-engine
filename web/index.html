@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+  <html lang="en-us">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brute Engine Web Demo</title>
+    <style>
+      body {
+        margin: auto;
+        background-color: black;
+        color: white;
+        font-family: monospace;
+        text-align: center;
+      }
+
+      #canvas {
+        margin: auto;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="canvas"
+      oncontextmenu="event.preventDefault()"
+      tabindex="-1"
+      width="800"
+      height="480"
+    ></canvas>
+    <div>
+      Controls:
+      <br/>
+      WASD or Arrow Keys to move
+      <br/>
+      Click on game to use mouse
+      <br/>
+      When using only keyboard, left and right are used for turning
+      <br/>
+      When using mouse, left and right are used for strafing
+    </div>
+    <script>
+      Module = {
+        print: console.log,
+        canvas: document.getElementById('canvas'),
+      };
+    </script>
+    <script async src=brute.js></script>
+  </body>
+</html>

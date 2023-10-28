@@ -1,6 +1,7 @@
 __pycache__
 /.vscode
 /build
+/buildemcc
 /buildsdl
 /brute
 /*.pdx
@@ -9,3 +10,4 @@ __pycache__
 /Source/flats
 /Source/patches
 /Source/assets.bin
+/web/brute.*

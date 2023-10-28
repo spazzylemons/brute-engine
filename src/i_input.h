@@ -20,10 +20,10 @@ typedef enum {
 // Get buttons held.
 buttonmask_t I_GetHeldButtons(void);
 
-// Get crank angle in degrees.
-float I_GetCrankAngle(void);
+// Get strength of analog input. Value has no real units or limits.
+float I_GetAnalogStrength(void);
 
-// Return true if crank docked.
-bool I_IsCrankDocked(void);
+// Return true if analog input can be used.
+bool I_HasAnalogInput(void);
 
 #endif
