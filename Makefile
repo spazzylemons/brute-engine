@@ -27,7 +27,7 @@ clean:
 	$(MAKE) -f Makefile.emscripten clean
 	$(MAKE) -f Makefile.playdate clean
 	$(MAKE) -f Makefile.sdl clean
-	-rm -rf Source/assets.bingit 
+	-rm -rf Source/assets.bin
 
 assetextract:
 	tools/map_converter.py assets/ Source/assets.bin
