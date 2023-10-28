@@ -101,8 +101,8 @@ static void DrawWallColumns(
     cliptype_t floorclip
 ) {
     // Location of wall endpoints.
-    fixed_t hfrac = (SCRNDISTI * heightceiling) / distleft;
-    fixed_t lfrac = (SCRNDISTI * heightfloor) / distleft;
+    fixed_t hfrac = ((SCRNDISTI * heightceiling) / distleft) + ((SCREENHEIGHT >> 1) << FRACBITS);
+    fixed_t lfrac = ((SCRNDISTI * heightfloor) / distleft) + ((SCREENHEIGHT >> 1) << FRACBITS);
     // X distance to draw.
     uint16_t dx = renderxmax - renderxmin;
     // Factor to scale wall endpoint step values.
@@ -126,8 +126,8 @@ static void DrawWallColumns(
     // Wall drawing loop.
     for (uint16_t x = renderxmin; x < renderxmax; x++) {
         // Find integer endpoints on screen.
-        int32_t yh = (hfrac >> FRACBITS) + (SCREENHEIGHT >> 1);
-        int32_t yl = (lfrac >> FRACBITS) + (SCREENHEIGHT >> 1);
+        int32_t yh = hfrac >> FRACBITS;
+        int32_t yl = lfrac >> FRACBITS;
         // Draw patch if present.
         if (patch != NULL) {
             // Calculate which column to render.
@@ -144,6 +144,8 @@ static void DrawWallColumns(
             dc_yl = ClipYPoint(yl, x);
             // Draw the column.
             R_DrawColumn();
+            // Advance scale.
+            scale += scalestep;
         }
         // Update bounds.
         prevminy[x] = renderminy[x];
@@ -153,7 +155,6 @@ static void DrawWallColumns(
         // Step accumulators.
         hfrac += hstep;
         lfrac += lstep;
-        scale += scalestep;
     }
 }
 

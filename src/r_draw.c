@@ -4,8 +4,11 @@
 // Number of bytes in a framebuffer row.
 #define ROWSTRIDE 52
 
+// Mask for iterating steps.
+#define STEPMASK(_mask_) (((_mask_) << FRACBITS) | ((1 << FRACBITS) - 1))
+
 // Mask for iterating flat steps.
-#define FLATMASK ((63 << FRACBITS) | ((1 << FRACBITS) - 1))
+#define FLATMASK STEPMASK(63)
 
 // Framebuffer.
 static uint8_t *__attribute__((aligned(4))) renderbuf;
@@ -77,15 +80,15 @@ void R_DrawColumn(void) {
     const uint8_t *source = dc_source;
     // For speed, use fixed-point accumulator instead of repeated multiply and divide.
     fixed_t fracstep = dc_scale;
-    fixed_t frac = fracstep * (yh - (SCREENHEIGHT >> 1)) + dc_offset;
     // Convert scale to mask.
-    uint8_t mask = dc_height - 1;
+    fixed_t mask = STEPMASK(dc_height - 1);
+    fixed_t frac = (fracstep * (yh - (SCREENHEIGHT >> 1)) + dc_offset) & mask;
     for (uint8_t y = yh; y < yl; y++) {
         // Plot pixel.
-        uint8_t pixel = source[(frac >> FRACBITS) & mask];
+        uint8_t pixel = source[frac >> FRACBITS];
         PlotPixel(framebuffer, drawshades[pixel][y & 3], xmask);
         // Advance fractional step.
-        frac = (frac + fracstep) & ((mask << FRACBITS) | ((1 << FRACBITS) - 1));
+        frac = (frac + fracstep) & mask;
         // Move to next row to copy to.
         framebuffer += ROWSTRIDE;
     }
