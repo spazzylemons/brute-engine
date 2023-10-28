@@ -13,5 +13,6 @@ module. Code organization is a constant work-in-progress.
 - M: Map loading and processing
 - R: Rendering
 - U: Utilities (Math, etc.)
+- W: Asset management
 - Y: Logging
 - Z: Memory management
