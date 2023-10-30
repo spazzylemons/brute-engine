@@ -1,3 +1,4 @@
+#include "r_flat.h"
 #include "r_local.h"
 #include "r_sector.h"
 #include "r_wall.h"
@@ -11,7 +12,7 @@ typedef struct {
     float left, right;
 } sectorstack_t;
 
-void R_DrawSector(sector_t *sector, float left, float right) {
+void R_DrawSector(sector_t *sector, uint16_t left, uint16_t right) {
     // Stack of sector data.
     static sectorstack_t sectorstack[MAXSECTORDEPTH];
 
@@ -26,14 +27,15 @@ void R_DrawSector(sector_t *sector, float left, float right) {
         // Pop from stack.
         --depth;
         rendersector = sectorstack[depth].sector;
-        left = sectorstack[depth].left;
-        right = sectorstack[depth].right;
+        sectorxmin = sectorstack[depth].left;
+        sectorxmax = sectorstack[depth].right;
+        R_WallSectorHeight();
+        R_WallYBoundsUpdate();
         // Check each wall in the sector.
         for (size_t i = 0; i < rendersector->num_walls; i++) {
             const wall_t *wall = &rendersector->walls[i];
             // Bounds of wall.
-            float nleft = left;
-            float nright = right;
+            uint16_t nleft, nright;
             // Check if portal should be drawn.
             if (R_DrawWall(wall, &nleft, &nright)) {
                 if (__builtin_expect(depth < MAXSECTORDEPTH, 0)) {
@@ -44,5 +46,6 @@ void R_DrawSector(sector_t *sector, float left, float right) {
                 }
             }
         }
+        R_DrawWallFlats();
     } while (depth != 0);
 }

@@ -13,8 +13,8 @@
 // Half of screen width as integer.
 #define SCRNDISTI 200
 
-extern uint16_t renderxmin; // Left X coordinate of wall rendering, inclusive.
-extern uint16_t renderxmax; // Right X coordinate of wall rendering, exclusive.
+extern uint16_t sectorxmin; // Minimum X screen coordinate of sector, inclusive.
+extern uint16_t sectorxmax; // Maximum X screen coordinate of sector, exclusive.
 
 extern const sector_t *rendersector; // Sector being rendered.
 

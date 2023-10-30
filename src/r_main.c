@@ -1,3 +1,4 @@
+#include "i_video.h"
 #include "i_time.h"
 #include "r_draw.h"
 #include "r_flat.h"
@@ -29,7 +30,7 @@ void R_RenderViewpoint(const actor_t *actor) {
     R_InitWallGlobals(actor->angle, eyeheight);
     R_InitFlatGlobals(actor->angle);
     // Draw the sector that the actor is in.
-    R_DrawSector(actor->sector, -SCRNDIST, SCRNDIST);
+    R_DrawSector(actor->sector, 0, SCREENWIDTH);
     // Flush the framebuffer.
     R_FlushFramebuffer();
 }
