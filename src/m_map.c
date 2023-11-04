@@ -12,11 +12,15 @@ static float WallPointDist(const wall_t *wall, const vector_t *point) {
         (wall->v2->x - wall->v1->x) * (point->y - wall->v1->y);
 }
 
+bool M_PointInFrontOfWall(const wall_t *wall, const vector_t *point) {
+    return WallPointDist(wall, point) >= 0.0f;
+}
+
 bool M_SectorContainsPoint(const sector_t *sector, const vector_t *point) {
     for (size_t i = 0; i < sector->num_walls; i++) {
         const wall_t *wall = &sector->walls[i];
         // Test if point lies in front of line.
-        if (WallPointDist(wall, point) < 0.0f) {
+        if (!M_PointInFrontOfWall(wall, point)) {
             return false;
         }
     }
@@ -198,30 +202,29 @@ static const wall_t *SectorCollide(
     return closest;
 }
 
-sector_t *M_MoveAndSlide(
-    sector_t *sector,
-    vector_t *pos,
-    float zpos,
-    vector_t *delta
-) {
+void M_MoveAndSlide(actor_t *actor) {
     // Only allow so many sector changes.
     uint8_t changes_left = 5;
-    while (changes_left-- && U_VecLenSq(delta) > 0.001f) {
+    while (changes_left-- && U_VecLenSq(&actor->vel) > 0.001f) {
         vector_t old_delta;
-        U_VecCopy(&old_delta, delta);
-        const wall_t *wall = SectorCollide(pos, zpos, delta, sector);
-        if (wall != NULL) {
-            sector = FindPlayerSector(sector, pos);
-        } else {
-            U_VecAdd(pos, delta);
-            sector = FindPlayerSector(sector, pos);
+        U_VecCopy(&old_delta, &actor->vel);
+        const wall_t *wall = SectorCollide(
+            &actor->pos,
+            actor->zpos,
+            &actor->vel,
+            actor->sector
+        );
+        if (wall == NULL) {
+            U_VecAdd(&actor->pos, &actor->vel);
+        }
+        A_ActorUpdateSector(actor);
+        if (wall == NULL) {
             break;
         }
     }
     // Zero out velocity if it's too small.
-    if (U_VecLenSq(delta) <= 0.001f) {
-        delta->x = 0.0f;
-        delta->y = 0.0f;
+    if (U_VecLenSq(&actor->vel) <= 0.001f) {
+        actor->vel.x = 0.0f;
+        actor->vel.y = 0.0f;
     }
-    return sector;
 }

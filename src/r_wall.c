@@ -28,8 +28,6 @@ static int32_t distright; // Distance of right side of wall.
 static int32_t uvleft;  // Left UV X coordinate.
 static int32_t uvright; // Right UV X coordinate.
 
-static fixed_t rendereyeheight; // Eye height to render at.
-
 // Enum for how to clip sector bounds.
 typedef enum {
     CLIP_NONE,      // Perform no clipping.
@@ -80,7 +78,7 @@ static void TryClip(cliptype_t cliptype, uint8_t val, int32_t x) {
     }
 }
 
-static void RotatePoint(vector_t *v) {
+void R_RotatePoint(vector_t *v) {
     float x = v->x * wallcosine - v->y * wallsine;
     v->y = v->x * wallsine + v->y * wallcosine;
     v->x = x;
@@ -221,8 +219,8 @@ static bool ClipWall(uint16_t *left, uint16_t *right) {
     U_VecSub(&a, &renderpos);
     U_VecSub(&b, &renderpos);
     // Rotate by render angle.
-    RotatePoint(&a);
-    RotatePoint(&b);
+    R_RotatePoint(&a);
+    R_RotatePoint(&b);
     // Check clipping on left side of frustrum.
     clip_t cl;
     cl.bound = sectorxmin - SCRNDIST;
@@ -325,12 +323,21 @@ void R_WallYBoundsUpdate(void) {
     memcpy(&prevmaxy[sectorxmin], &clipmaxy[sectorxmin], sectorxmax - sectorxmin);
 }
 
+void R_CopyClipBounds(uint8_t *buf) {
+    memcpy(&buf[0], &clipminy[sectorxmin], sectorxmax - sectorxmin);
+    memcpy(&buf[sectorxmax - sectorxmin], &clipmaxy[sectorxmin], sectorxmax - sectorxmin);
+}
+
 bool R_DrawWall(const wall_t *wall, uint16_t *left, uint16_t *right) {
     renderwall = wall;
 
     if (!ClipWall(left, right)) {
         return false;
     }
+
+    // TODO remove these statics
+    wallminx = renderxmin;
+    wallmaxx = renderxmax;
 
     heightceiling = sectorceiling;
     heightfloor = sectorfloor;
@@ -353,9 +360,7 @@ bool R_DrawWall(const wall_t *wall, uint16_t *left, uint16_t *right) {
             SetColumnOffset(heightceiling, renderwall->botpatch);
             DrawWallColumns(renderwall->botpatch, CLIP_STEPFLOOR, CLIP_NONE);
         }
-
-        return true;
-    } else {
-        return false;
     }
+
+    return true;
 }

@@ -153,3 +153,27 @@ void *W_ReadLump(uint32_t num, size_t *size) {
     }
     return result;
 }
+
+void W_IterInit(branchiter_t *iter, uint32_t parent) {
+    // Get parent node.
+    const packnode_t *parentnode = GetNodeByNum(parent);
+    // Assert that it's a branch.
+    AssertBranch(parentnode);
+    // Get its children and size.
+    iter->remaining = parentnode->size & ~BRANCHFLAG;
+    iter->next = parentnode->offset;
+}
+
+uint32_t W_IterNext(branchiter_t *iter, char name[static MAXNODENAME]) {
+    // If remaining is 0, return 0.
+    if (iter->remaining == 0) {
+        return 0;
+    }
+    // If name requested, get the name.
+    if (name != NULL) {
+        memcpy(name, GetNodeByNum(iter->next)->name, MAXNODENAME);
+    }
+    // Get next, advance, and return.
+    --iter->remaining;
+    return iter->next++;
+}

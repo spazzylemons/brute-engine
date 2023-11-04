@@ -68,6 +68,14 @@ class Branch(Node):
         contents.extend(lumps)
         return bytes(contents)
 
+    def print(self):
+        def walk(branch: Branch, depth: int):
+            for entry in branch.children:
+                print(depth * '  ' + entry.name)
+                if isinstance(entry, Branch):
+                    walk(entry, depth + 1)
+        walk(self, 0)
+
 # A lump node.
 class Lump(Node):
     def __init__(self, name: str, content: bytes):

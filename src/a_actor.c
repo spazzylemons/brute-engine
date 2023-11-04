@@ -10,7 +10,7 @@
 #define CLIMB_SPEED 6.0f
 
 // The list of actors.
-static EMPTY_LIST(actorlist);
+EMPTY_LIST(actorlist);
 
 void A_ActorClear(void) {
     listiter_t iter;
@@ -31,10 +31,12 @@ actor_t *A_ActorSpawn(
 ) {
     // Allocate actor.
     actor_t *actor = Allocate(class->size);
-    // Add to linked list.
+    // Add to linked lists.
     U_ListInsert(&actorlist, &actor->list);
+    U_ListInsert(&sector->actors, &actor->slist);
     // Fill in fields.
     U_VecCopy(&actor->pos, pos);
+    actor->flags = 0;
     actor->vel.x = 0.0f;
     actor->vel.y = 0.0f;
     actor->angle = angle;
@@ -63,8 +65,8 @@ void A_ActorUpdate(void) {
 }
 
 void A_ActorApplyVelocity(actor_t *this) {
-    // Move and slide on map.
-    this->sector = M_MoveAndSlide(this->sector, &this->pos, this->zpos, &this->vel);
+    // TODO reduce coupling
+    M_MoveAndSlide(this);
 }
 
 void A_ActorApplyGravity(actor_t *this) {
@@ -98,5 +100,40 @@ void A_ActorApplyGravity(actor_t *this) {
         }
     } else {
         this->zvel += GRAVITY;
+    }
+}
+
+void A_ActorUpdateSector(actor_t *this) {
+    M_SectorIterInit(this->sector);
+
+    // Iterate until we find a sector that contains the actor in its walls.
+    sector_t *sector;
+    while ((sector = M_SectorIterPop())) {
+        if (M_SectorContainsPoint(sector, &this->pos)) {
+            // This sector contains our point.
+            break;
+        }
+
+        // Find any portals and follow them.
+        for (size_t i = 0; i < sector->num_walls; i++) {
+            const wall_t *wall = &sector->walls[i];
+            if (wall->portal != NULL) {
+                M_SectorIterPush(wall->portal);
+            }
+        }
+    }
+    M_SectorIterCleanup();
+
+    // If the actor somehow isn't in any sector, keep it in the sector it was
+    // last seen in, as a failsafe. Otherwise, update the value of its sector
+    // field, and link it to the list of the new sector. Also, don't do anything
+    // if the sector didn't change.
+    if (sector != NULL && sector != this->sector) {
+        // Unlink from previous sector.
+        U_ListRemove(&this->slist);
+        // Link to new sector.
+        U_ListInsert(&sector->actors, &this->slist);
+        // Update sector field.
+        this->sector = sector;
     }
 }

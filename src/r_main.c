@@ -1,5 +1,6 @@
 #include "i_video.h"
 #include "i_time.h"
+#include "r_actor.h"
 #include "r_draw.h"
 #include "r_flat.h"
 #include "r_local.h"
@@ -31,6 +32,8 @@ void R_RenderViewpoint(const actor_t *actor) {
     R_InitFlatGlobals(actor->angle);
     // Draw the sector that the actor is in.
     R_DrawSector(actor->sector, 0, SCREENWIDTH);
+    // Draw actors on top of the level geometry.
+    R_DrawActors();
     // Flush the framebuffer.
     R_FlushFramebuffer();
 }

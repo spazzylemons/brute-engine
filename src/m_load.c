@@ -287,6 +287,8 @@ static void LoadSectors(uint32_t branch, map_t *map) {
         // Initialize iterator lists.
         sector->next_seen = NULL;
         sector->next_queue = NULL;
+        // Initialize actor list.
+        U_ListInit(&sector->actors);
         // Set flats.
         sector->floorflat = GetFlatById(map, fsector->floorflat);
         sector->ceilflat = GetFlatById(map, fsector->ceilflat);

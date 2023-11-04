@@ -2,6 +2,7 @@
 #define BRUTE_M_DEFS_H
 
 #include "u_aabb.h"
+#include "u_list.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -52,6 +53,8 @@ typedef struct sector_s {
     struct sector_s *next_seen;
     // The next sector in the multipurpose queue.
     struct sector_s *next_queue;
+    // The list of actors in this sector.
+    list_t actors;
     // The bounding box of this sector.
     aabb_t bounds;
     // The number of walls in this sector.

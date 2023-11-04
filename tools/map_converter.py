@@ -229,53 +229,135 @@ def write_flat(filepath, name) -> Lump:
     assert width == 64 and height == 64
     return Lump(name.lower(), pixels)
 
+def write_sprite(filepath, name) -> Lump:
+    img = Image.open(filepath)
+    # Use the grAb chunk, if present, to get the image offsets.
+    offx = 0
+    offy = 0
+    for (chunktype, data) in img.private_chunks:
+        if chunktype == b'grAb':
+            offx, offy = struct.unpack('>ii', data)
+    width, height = img.size
+    postarrays = []
+    postoffset = None
+    for x in range(width):
+        posts = []
+        lastpoststart = 0
+        for y in range(height):
+            color, alpha = img.getpixel((x, y))
+            if alpha == 255:
+                if postoffset is None:
+                    postoffset = y - lastpoststart
+                    postdata = bytearray()
+                postdata.append(PALETTE_CONV.index(color))
+            elif postoffset is not None:
+                posts.append((postoffset, postdata))
+                postoffset = None
+                lastpoststart = y
+        if postoffset is not None:
+            posts.append((postoffset, postdata))
+            postoffset = None
+        postarrays.append(posts)
+    result = bytearray()
+    result.extend(struct.pack('<hhHH', offx, offy, width, height))
+    # TODO consider post compression later on?
+    chunks = bytearray()
+    for postarray in postarrays:
+        result.extend(struct.pack('<I', len(chunks)))
+        chunk = bytearray()
+        for offset, data in postarray:
+            chunk.extend(struct.pack('<BB', len(data), offset))
+            chunk.extend(data)
+        chunk.append(0)
+        chunks.extend(chunk)
+    result.extend(chunks)
+    return Lump(name.lower(), result)
+
 # Game assets are stored in GZDoom directory format before being converted to
 # custom formats for our engine.
 
-# Convert flats.
-src_flatdir = sys.argv[1] + '/flats'
-flatsbranch = Branch('flats')
-for filename in os.listdir(src_flatdir):
-    # Get output name.
-    name, _ = os.path.splitext(filename)
-    name = name.lower()
-    # Load PNG.
-    flatsbranch.children.append(write_flat(src_flatdir + '/' + filename, name))
-# Convert patches.
-src_patchdir = sys.argv[1] + '/patches'
-patchesbranch = Branch('patches')
-for filename in os.listdir(src_patchdir):
-    # Get output name.
-    name, _ = os.path.splitext(filename)
-    name = name.lower()
-    # Load PNG.
-    patchesbranch.children.append(write_patch(src_patchdir + '/' + filename, name))
-# Convert maps.
-src_mapdir = sys.argv[1] + '/maps'
-mapbranch = Branch('maps')
-for filename in os.listdir(src_mapdir):
-    mapname, _ = os.path.splitext(filename)
-    mapname = mapname.lower()
-    # Parse WAD file.
-    lumps = {}
-    with open(src_mapdir + '/' + filename, 'rb') as wadfile:
-        if wadfile.read(4) != b'PWAD':
-            print('Not a PWAD', file=sys.stderr)
-            exit(1)
-        numlumps, infotableofs = struct.unpack('<ii', wadfile.read(8))
-        for i in range(numlumps):
-            wadfile.seek(infotableofs + 16 * i, io.SEEK_SET)
-            filepos, size = struct.unpack('<ii', wadfile.read(8))
-            name = wadfile.read(8)
-            if 0 in name:
-                name = name[:name.index(0)]
-            name = name.decode()
-            if name == 'TEXTMAP':
-                wadfile.seek(filepos, io.SEEK_SET)
-                mapbranch.children.append(handle_udmf(wadfile.read(size), mapname))
+def make_flats_branch():
+    srcdir = sys.argv[1] + '/flats'
+    branch = Branch('flats')
+    for filename in os.listdir(srcdir):
+        # Get output name.
+        name, _ = os.path.splitext(filename)
+        name = name.lower()
+        # Load PNG.
+        branch.children.append(write_flat(srcdir + '/' + filename, name))
+    return branch
+
+def make_patches_branch():
+    srcdir = sys.argv[1] + '/patches'
+    branch = Branch('patches')
+    for filename in os.listdir(srcdir):
+        # Get output name.
+        name, _ = os.path.splitext(filename)
+        name = name.lower()
+        # Load PNG.
+        branch.children.append(write_patch(srcdir + '/' + filename, name))
+    return branch
+
+def make_maps_branch():
+    srcdir = sys.argv[1] + '/maps'
+    branch = Branch('maps')
+    for filename in os.listdir(srcdir):
+        mapname, _ = os.path.splitext(filename)
+        mapname = mapname.lower()
+        # Parse WAD file.
+        lumps = {}
+        with open(srcdir + '/' + filename, 'rb') as wadfile:
+            if wadfile.read(4) != b'PWAD':
+                print('Not a PWAD', file=sys.stderr)
+                exit(1)
+            numlumps, infotableofs = struct.unpack('<ii', wadfile.read(8))
+            for i in range(numlumps):
+                wadfile.seek(infotableofs + 16 * i, io.SEEK_SET)
+                filepos, size = struct.unpack('<ii', wadfile.read(8))
+                name = wadfile.read(8)
+                if 0 in name:
+                    name = name[:name.index(0)]
+                name = name.decode()
+                if name == 'TEXTMAP':
+                    wadfile.seek(filepos, io.SEEK_SET)
+                    branch.children.append(handle_udmf(wadfile.read(size), mapname))
+    return branch
+
+def make_sprites_branch():
+    srcdir = sys.argv[1] + '/sprites'
+    branch = Branch('sprites')
+    # Iterate through sprites.
+    spritebranches = {}
+    framebranches = {}
+    for filename in os.listdir(srcdir):
+        # Get output name.
+        name, _ = os.path.splitext(filename)
+        name = name.lower()
+        # Split into parts.
+        base = name[0:4]
+        frame = name[4]
+        angle = name[5:]
+        # Load PNG.
+        sprite = write_sprite(srcdir + '/' + filename, angle)
+        # Make current branches if needed.
+        if base not in spritebranches:
+            newbranch = Branch(base)
+            branch.children.append(newbranch)
+            spritebranches[base] = newbranch
+            framebranches[base] = {}
+        if frame not in framebranches[base]:
+            newbranch = Branch(frame)
+            spritebranches[base].children.append(newbranch)
+            framebranches[base][frame] = newbranch
+        framebranch = framebranches[base][frame]
+        framebranch.children.append(sprite)
+    return branch
+
 root = Branch('')
-root.children.append(flatsbranch)
-root.children.append(patchesbranch)
-root.children.append(mapbranch)
+root.children.append(make_flats_branch())
+root.children.append(make_maps_branch())
+root.children.append(make_patches_branch())
+root.children.append(make_sprites_branch())
+
 with open(sys.argv[2], 'wb') as file:
     file.write(root.serialize())

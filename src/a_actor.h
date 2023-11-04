@@ -9,11 +9,25 @@
 #include "m_defs.h"
 #include "u_list.h"
 
+typedef enum {
+    ACTOR_NORENDER = (1 << 0), // Don't render this actor.
+} actorflags_t;
+
+// A sprite type.
+typedef enum {
+    SPR_TEST,
+    NUMSPRITES,
+} spritetype_t;
+
 // An actor. This is the base of all actor objects, which can derive from this
 // struct by including it as their first member.
 typedef struct {
     // Node in list of actors.
     list_t list;
+    // Node in list of actors per sector.
+    list_t slist;
+    // Various flags.
+    actorflags_t flags;
     // The actor's position.
     vector_t pos;
     // The actor's horizontal velocity.
@@ -29,6 +43,8 @@ typedef struct {
     // The actor's class.
     const struct actorclass_s *class;
 } actor_t;
+
+extern list_t actorlist;
 
 // An actor class. Describes how an actor should act.
 typedef struct actorclass_s {
@@ -61,6 +77,9 @@ void A_ActorApplyVelocity(actor_t *this);
 
 // Common code for applying gravity.
 void A_ActorApplyGravity(actor_t *this);
+
+// Update the actor's current sector.
+void A_ActorUpdateSector(actor_t *this);
 
 // Update all actors.
 void A_ActorUpdate(void);

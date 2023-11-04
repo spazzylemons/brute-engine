@@ -21,7 +21,7 @@ void U_ListRemove(list_t *element) {
     element->prev = NULL;
 }
 
-void U_ListIterInit(listiter_t *iter, list_t *list) {
+void U_ListIterInit(listiter_t *iter, const list_t *list) {
     iter->head = list;
     iter->next = list->next;
 }

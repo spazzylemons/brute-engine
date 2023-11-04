@@ -23,12 +23,14 @@ VPATH += src
 # List C source files here
 SRC = \
 	src/a_actor.c \
+	src/a_misc.c \
 	src/a_player.c \
 	src/b_main.c \
 	src/i_playdate.c \
 	src/m_iter.c \
 	src/m_load.c \
 	src/m_map.c \
+	src/r_actor.c \
 	src/r_draw.c \
 	src/r_fixed.c \
 	src/r_flat.c \

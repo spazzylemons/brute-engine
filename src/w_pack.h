@@ -18,6 +18,12 @@
 // The ID of the root node.
 #define ROOTID 0
 
+// Branch iterator.
+typedef struct {
+    uint32_t remaining; // Number of remaining nodes.
+    uint32_t next;      // Next node to load.
+} branchiter_t;
+
 // Open a pack. Returns true on success.
 bool W_Open(const char *filename);
 
@@ -32,5 +38,11 @@ uint32_t W_GetNumByName(uint32_t parent, const char *name);
 
 // Read a lump node into memory.
 void *W_ReadLump(uint32_t num, size_t *size);
+
+// Initialize a branch iterator.
+void W_IterInit(branchiter_t *iter, uint32_t parent);
+
+// Get next node in branch, or 0 if at end. Optionally retrieve name.
+uint32_t W_IterNext(branchiter_t *iter, char name[static MAXNODENAME]);
 
 #endif

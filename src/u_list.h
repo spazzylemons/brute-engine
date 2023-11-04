@@ -17,7 +17,7 @@ typedef struct list_s {
 // List iterator.
 typedef struct {
     // Head of list.
-    list_t *head;
+    const list_t *head;
     // Next list element to iterate on.
     list_t *next;
 } listiter_t;
@@ -35,7 +35,7 @@ void U_ListInsert(list_t *list, list_t *element);
 void U_ListRemove(list_t *element);
 
 // Initialize a list iterator.
-void U_ListIterInit(listiter_t *iter, list_t *list);
+void U_ListIterInit(listiter_t *iter, const list_t *list);
 
 // Get the next value in the list iterator. Returns NULL when at the end.
 // It is safe to remove this element from the list.

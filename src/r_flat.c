@@ -83,6 +83,10 @@ void R_DrawFlat(const flat_t *flat, const uint8_t *miny, const uint8_t *maxy, in
             spanstart[b1] = x;
             b1++;
         }
+        if (x + 1 < sectorxmax) {
+            t1 = t2;
+            b1 = b2;
+        }
     }
     // Finish drawing spans that reach to the edge.
     for (uint8_t y = t1; y < b1; y++) {

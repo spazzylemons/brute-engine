@@ -8,6 +8,8 @@
 // Turn speed multiplier.
 #define TURNSPEED 0.005f
 
+extern actor_t *fortesting;
+
 // Move the player in crank mode.
 static void MovePlayerCrank(actor_t *this, vector_t *delta, buttonmask_t held) {
     this->angle = U_AngleAdd(this->angle, I_GetAnalogStrength() * TURNSPEED);
@@ -68,6 +70,10 @@ static void MovePlayerDPad(actor_t *this, vector_t *delta, buttonmask_t held) {
     }
 }
 
+static void Init(actor_t *this) {
+    this->flags |= ACTOR_NORENDER;
+}
+
 static void Update(actor_t *this) {
     buttonmask_t held = I_GetHeldButtons();
 
@@ -77,6 +83,11 @@ static void Update(actor_t *this) {
         MovePlayerCrank(this, &delta, held);
     } else {
         MovePlayerDPad(this, &delta, held);
+    }
+
+    if (held & BTN_A) {
+        U_VecCopy(&fortesting->pos, &this->pos);
+        A_ActorUpdateSector(fortesting);
     }
 
     // Gradually approach target velocity.
@@ -90,6 +101,6 @@ static void Update(actor_t *this) {
 
 const actorclass_t A_ClassPlayer = {
     .size = sizeof(actor_t),
-    .init = NULL,
+    .init = Init,
     .update = Update,
 };
