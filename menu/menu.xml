@@ -20,8 +20,8 @@
     <item>
       <label>Graphic Detail</label>
       <widget type="choice" ref="detaillevel">
-        <choice>Low</choice>
         <choice>High</choice>
+        <choice>Low</choice>
       </widget>
     </item>
   </screen>

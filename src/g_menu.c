@@ -17,8 +17,8 @@
 
 #define ARRLEN(_arr_) sizeof(_arr_) / sizeof((_arr_)[0])
 
-// Temporary byte for detail level.
-static uint8_t detaillevel = 0;
+// Detail level setting. 0 = High, 1 = Low
+uint8_t detaillevel = 0;
 
 // Menu font.
 static font_t *font;
@@ -166,14 +166,14 @@ void G_MenuShow(void) {
             return;
         }
     }
+    // Handle widget interactions.
+    HandleWidget(pressed);
     // If menu has a target, switch to that target.
     if (pressed & BTN_A) {
         if (CurrentItem()->target != NULL) {
             SelectMenu(CurrentItem()->target);
         }
     }
-    // Handle widget interactions.
-    HandleWidget(pressed);
     // If up or down pressed, move pointer accordingly.
     if (pressed & BTN_U) {
         if (itemindex == 0) {
