@@ -40,4 +40,14 @@ extern uint8_t        ds_y;      // Y coordinate to draw in.
 // Draw a span left to right. Bounds are not checked.
 void R_DrawSpan(void);
 
+// Parameters for R_Blit.
+extern const uint8_t *blit_source; // Bits to blit. Must be in interleaved format.
+extern uint8_t        blit_length; // Number of bytes to blit.
+extern uint16_t       blit_x;      // Starting X position.
+extern uint8_t        blit_y;      // Y position.
+
+// Blit a row of bits to the framebuffer. Bounds are not checked.
+// Bits should not be blitted partially off-screen.
+void R_Blit(void);
+
 #endif

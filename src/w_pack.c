@@ -164,7 +164,7 @@ void W_IterInit(branchiter_t *iter, uint32_t parent) {
     iter->next = parentnode->offset;
 }
 
-uint32_t W_IterNext(branchiter_t *iter, char name[static MAXNODENAME]) {
+uint32_t W_IterNext(branchiter_t *iter, char *name) {
     // If remaining is 0, return 0.
     if (iter->remaining == 0) {
         return 0;

@@ -1,7 +1,10 @@
 #include "a_classes.h"
+#include "g_menu.h"
+#include "i_input.h"
 #include "i_video.h"
 #include "m_load.h"
 #include "r_actor.h"
+#include "r_draw.h"
 #include "r_main.h"
 #include "u_error.h"
 #include "w_pack.h"
@@ -17,9 +20,11 @@ void B_MainInit(void) {
         Error("Failed to open pack");
     }
 
+    // Init modules.
+    G_MenuInit();
+    M_Init();
     R_LoadSprites();
 
-    M_Init();
     map = M_Load("map01");
 
     // Spawn the player.
@@ -34,13 +39,28 @@ void B_MainInit(void) {
 }
 
 void B_MainLoop(void) {
-    A_ActorUpdate();
+    R_LoadFramebuffer();
+    if (!G_IsMenuOpen()) {
+        A_ActorUpdate();
+        // If menu button pressed, open menu.
+        if (I_GetPressedButtons() & BTN_M) {
+            G_MenuReset();
+        }
+    }
+    // Draw player viewpoint.
     R_RenderViewpoint(player);
+    if (G_IsMenuOpen()) {
+        G_MenuShow();
+    }
+    R_FlushFramebuffer();
+
     I_DrawFPS();
 }
 
 void B_MainQuit(void) {
+    // Clean up modules.
     A_ActorClear();
+    G_MenuDeinit();
     M_Free(map);
     R_FreeSprites();
     W_Close();

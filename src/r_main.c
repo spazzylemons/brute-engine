@@ -14,6 +14,7 @@
 // Calculate view bobbing.
 static float ViewBobbing(const actor_t *actor) {
     // Calculate where in animation we are.
+    // TODO don't rely on system time, use in-game tics instead.
     float animangle = (I_GetMillis() & 511) * (TAU / 512.0f);
     // Figure out the intensity of view bobbing.
     float mag = U_VecLenSq(&actor->vel) * 0.1f;
@@ -21,8 +22,6 @@ static float ViewBobbing(const actor_t *actor) {
 }
 
 void R_RenderViewpoint(const actor_t *actor) {
-    // Load the framebuffer.
-    R_LoadFramebuffer();
     // Init state of each submodule.
     U_VecCopy(&renderpos, &actor->pos);    
     float eyeheight = actor->zpos;
@@ -34,6 +33,4 @@ void R_RenderViewpoint(const actor_t *actor) {
     R_DrawSector(actor->sector, 0, SCREENWIDTH);
     // Draw actors on top of the level geometry.
     R_DrawActors();
-    // Flush the framebuffer.
-    R_FlushFramebuffer();
 }

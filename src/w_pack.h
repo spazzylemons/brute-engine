@@ -43,6 +43,6 @@ void *W_ReadLump(uint32_t num, size_t *size);
 void W_IterInit(branchiter_t *iter, uint32_t parent);
 
 // Get next node in branch, or 0 if at end. Optionally retrieve name.
-uint32_t W_IterNext(branchiter_t *iter, char name[static MAXNODENAME]);
+uint32_t W_IterNext(branchiter_t *iter, char *name);
 
 #endif

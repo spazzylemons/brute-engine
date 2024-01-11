@@ -15,10 +15,14 @@ typedef enum {
     BTN_D = (1 << 3),
     BTN_B = (1 << 4),
     BTN_A = (1 << 5),
+    BTN_M = (1 << 6), // Menu "button".
 } buttonmask_t;
 
 // Get buttons held.
 buttonmask_t I_GetHeldButtons(void);
+
+// Get buttons pressed.
+buttonmask_t I_GetPressedButtons(void);
 
 // Get strength of analog input. Value has no real units or limits.
 float I_GetAnalogStrength(void);

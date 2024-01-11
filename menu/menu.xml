@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE menu SYSTEM "menu.dtd">
+<menu>
+  <screen id="main">
+    <item>
+      <label>New Game</label>
+    </item>
+    <item>
+      <label>Load Game</label>
+    </item>
+    <item>
+      <label>Save Game</label>
+    </item>
+    <item target="options">
+      <label>Options</label>
+    </item>
+  </screen>
+
+  <screen id="options" parent="main">
+    <item>
+      <label>Graphic Detail</label>
+      <widget type="choice" ref="detaillevel">
+        <choice>Low</choice>
+        <choice>High</choice>
+      </widget>
+    </item>
+  </screen>
+</menu>

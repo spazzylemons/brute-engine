@@ -1,3 +1,5 @@
+include Makefile.common
+
 TARGETDIR := web
 TARGET := $(TARGETDIR)/brute.js
 
@@ -8,38 +10,17 @@ LDFLAGS := -sUSE_SDL=2 -lSDL2 -lm --preload-file Source/assets.bin@/assets.bin
 BUILDDIR := buildemcc
 SRCDIR := src
 
-CFILES := \
-	src/a_actor.c \
-	src/a_misc.c \
-	src/a_player.c \
-	src/b_main.c \
-	src/i_sdl.c \
-	src/m_iter.c \
-	src/m_load.c \
-	src/m_map.c \
-	src/r_actor.c \
-	src/r_draw.c \
-	src/r_fixed.c \
-	src/r_flat.c \
-	src/r_local.c \
-	src/r_main.c \
-	src/r_sector.c \
-	src/r_wall.c \
-	src/u_aabb.c \
-	src/u_error.c \
-	src/u_file.c \
-	src/u_format.c \
-	src/u_list.c \
-	src/u_math.c \
-	src/u_vec.c \
-	src/w_pack.c \
-	src/y_log.c \
-	src/z_memory.c
+CFILES := $(SRCFILES) src/i_sdl.c
 
 OFILES := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(CFILES))
 DFILES := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.d,$(CFILES))
 
 all: $(TARGET)
+
+src/g_menu.c: src/g_menugen.inl
+
+src/g_menugen.inl:
+	tools/menu_generator.py
 
 $(TARGET): $(OFILES)
 	mkdir -p $(TARGETDIR)

@@ -11,6 +11,8 @@ import re
 import struct
 import sys
 
+from bob import convert_bob
+from font import convert_font
 from pack import Branch, Lump
 
 from PIL import Image
@@ -353,11 +355,33 @@ def make_sprites_branch():
         framebranch.children.append(sprite)
     return branch
 
+def make_fonts_branch():
+    srcdir = sys.argv[1] + '/fonts'
+    branch = Branch('fonts')
+    for filename in os.listdir(srcdir):
+        # Get output name.
+        name, _ = os.path.splitext(filename)
+        name = name.lower()
+        branch.children.append(convert_font(srcdir + '/' + filename, name))
+    return branch
+
+def make_bobs_branch():
+    srcdir = sys.argv[1] + '/bobs'
+    branch = Branch('bobs')
+    for filename in os.listdir(srcdir):
+        # Get output name.
+        name, _ = os.path.splitext(filename)
+        name = name.lower()
+        branch.children.append(convert_bob(name, Image.open(srcdir + '/' + filename)))
+    return branch
+
 root = Branch('')
 root.children.append(make_flats_branch())
 root.children.append(make_maps_branch())
 root.children.append(make_patches_branch())
 root.children.append(make_sprites_branch())
+root.children.append(make_fonts_branch())
+root.children.append(make_bobs_branch())
 
 with open(sys.argv[2], 'wb') as file:
     file.write(root.serialize())

@@ -1,0 +1,52 @@
+<!--
+  The menu XML file simplifies the construction of the game's pause menu by
+  allowing freeform construction of the menu structure without worrying about
+  forward declarations, variable naming, etc.
+-->
+
+<!--
+  The menu is the root of the document. It contains a collection of screens.
+  The "main" screen must appear in the document to be considered valid.
+-->
+<!ELEMENT menu (screen+)>
+
+<!--
+  A screen is a list of menu items. A screen must have at least one menu item.
+  It may have a parent which is returned to when the screen is exited.
+-->
+<!ELEMENT screen (item+)>
+<!ATTLIST screen
+  id     ID    #REQUIRED
+  parent IDREF #IMPLIED>
+
+<!--
+  An item is a selectable text line in a menu screen. It must have a label, and
+  may have a widget. If it has a target attribute, the item will change the
+  active menu screen to the screen specified in the target attribute.
+-->
+<!ELEMENT item (label,widget?)>
+<!ATTLIST item
+  target IDREF #IMPLIED>
+
+<!--
+  A label is a text description of a menu item displayed to the user.
+-->
+<!ELEMENT label (#PCDATA)>
+
+<!--
+  A widget allows for additional automated actions to be performed by a menu
+  item. The allowed widget types are:
+
+  - "choice": This widget has its ref attribute set to the name of the byte
+    variable that it can modify, and has a list of choice elements naming each
+    possible choice value in order.
+-->
+<!ELEMENT widget (choice+)>
+<!ATTLIST widget
+  type   (choice) #REQUIRED
+  ref    CDATA    #IMPLIED>
+
+<!--
+  A choice is a name for a selected choice in a choice widget.
+-->
+<!ELEMENT choice (#PCDATA)>

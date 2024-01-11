@@ -13,6 +13,7 @@
 static uint8_t __attribute__((aligned(4))) framebuffer[240 * 52];
 
 static buttonmask_t buttons = 0;
+static buttonmask_t pressed = 0;
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
@@ -31,6 +32,14 @@ static buttonmask_t TranslateKey(SDL_Keycode code) {
         case SDLK_DOWN:  return BTN_D;
         case SDLK_LEFT:  return BTN_L;
         case SDLK_RIGHT: return BTN_R;
+        // Z/X for B and A
+        case SDLK_z:     return BTN_B;
+        case SDLK_x:     return BTN_A;
+        // Ctrl/Space for B and A
+        case SDLK_LCTRL: return BTN_B;
+        case SDLK_SPACE: return BTN_A;
+        // Pause menu
+        case SDLK_p:     return BTN_M;
         // Any other key not yet mapped
         default:         return 0;
     }
@@ -71,16 +80,22 @@ uint32_t I_FileRead(file_t *file, void *buffer, uint32_t size) {
     return fread(buffer, 1, size, (FILE *) file);
 }
 
+static buttonmask_t MaskInvalid(buttonmask_t buttons) {
+    if ((buttons & (BTN_L | BTN_R)) == (BTN_L | BTN_R)) {
+        buttons &= ~(BTN_L | BTN_R);
+    }
+    if ((buttons & (BTN_U | BTN_D)) == (BTN_U | BTN_D)) {
+        buttons &= ~(BTN_U | BTN_D);
+    }
+    return buttons;
+}
+
 buttonmask_t I_GetHeldButtons(void) {
-    buttonmask_t result = buttons;
-    // Mask out invalid inputs.
-    if ((result & (BTN_L | BTN_R)) == (BTN_L | BTN_R)) {
-        result &= ~(BTN_L | BTN_R);
-    }
-    if ((result & (BTN_U | BTN_D)) == (BTN_U | BTN_D)) {
-        result &= ~(BTN_U | BTN_D);
-    }
-    return result;
+    return MaskInvalid(buttons);
+}
+
+buttonmask_t I_GetPressedButtons(void) {
+    return MaskInvalid(pressed);
 }
 
 float I_GetAnalogStrength(void) {
@@ -147,6 +162,7 @@ static bool loop(void) {
     mousemotion = 0.0f;
 
     // Run events.
+    buttonmask_t lastbuttons = buttons;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -194,6 +210,7 @@ static bool loop(void) {
             }
         }
     }
+    pressed = buttons & ~lastbuttons;
 
     if (!haserror) {
         if (CatchError()) {

@@ -30,6 +30,11 @@ uint16_t       ds_x1;
 uint16_t       ds_x2;
 uint8_t        ds_y;
 
+const uint8_t *blit_source;
+uint8_t        blit_length;
+uint16_t       blit_x;
+uint8_t        blit_y;
+
 #define DitherPattern(a, b, c, d) { a * 0x11, b * 0x11, c * 0x11, d * 0x11 }
 
 static const uint8_t drawshades[17][4] = {
@@ -125,5 +130,34 @@ void R_DrawSpan(void) {
             xmask = 0x80;
             ++framebuffer;
         }
+    }
+}
+
+void R_Blit(void) {
+    // Copy parameters.
+    const uint8_t *source = blit_source;
+    uint8_t length = blit_length;
+    uint16_t x = blit_x;
+    uint8_t y = blit_y;
+    // Framebuffer pointer.
+    uint8_t *framebuffer = &renderbuf[(x >> 3) + (ROWSTRIDE * y)];
+    // Create mask mask.
+    uint8_t shift = x & 7;
+    uint16_t maskmask = 0xff00ff >> shift;
+    // Simplify shift.
+    shift = 8 - shift;
+    // Run blitting.
+    while (length--) {
+        // Calculate new words to blit.
+        uint16_t maskword = (*source++ << shift) | maskmask;
+        uint16_t bitsword = *source++ << shift;
+        // Blit the high byte.
+        *framebuffer &= maskword >> 8;
+        *framebuffer |= bitsword >> 8;
+        // Advance to next byte.
+        ++framebuffer;
+        // Blit the low byte.
+        *framebuffer &= maskword;
+        *framebuffer |= bitsword;
     }
 }

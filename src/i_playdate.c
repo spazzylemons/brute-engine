@@ -4,6 +4,9 @@
 
 #include "pd_api.h"
 
+// Note on pause menu: The manu button is an undocumented seventh button. Therefore
+// we don't have to do anything to implement
+
 static PlaydateAPI *playdate;
 
 file_t *I_FileOpen(const char *path, openmode_t mode) {
@@ -47,6 +50,12 @@ uint32_t I_FileRead(file_t *file, void *buffer, uint32_t size) {
 buttonmask_t I_GetHeldButtons(void) {
     PDButtons buttons;
     playdate->system->getButtonState(&buttons, NULL, NULL);
+    return (buttonmask_t) buttons;
+}
+
+buttonmask_t I_GetPressedButtons(void) {
+    PDButtons buttons;
+    playdate->system->getButtonState(NULL, &buttons, NULL);
     return (buttonmask_t) buttons;
 }
 
@@ -136,6 +145,7 @@ int eventHandler(PlaydateAPI *pd, PDSystemEvent event, uint32_t arg) {
         case kEventInit: {
             playdate = pd;
             playdate->system->setUpdateCallback(update, NULL);
+
             if (CatchError()) {
                 haderror = true;
             } else {

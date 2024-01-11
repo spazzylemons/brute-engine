@@ -11,3 +11,4 @@ __pycache__
 /Source/patches
 /Source/assets.bin
 /web/brute.*
+/src/g_menugen.inl
