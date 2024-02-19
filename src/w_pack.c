@@ -1,5 +1,5 @@
 #include "i_file.h"
-#include "u_error.h"
+#include "i_system.h"
 #include "u_list.h"
 #include "w_pack.h"
 #include "y_log.h"
@@ -82,11 +82,11 @@ void W_Close(void) {
 static packnode_t *GetNodeByNum(uint32_t num) {
     // Check if pack is loaded.
     if (packnodes == NULL) {
-        Error("No pack loaded");
+        I_Error("No pack loaded");
     }
     // Check if index is valid.
     if (num >= packnodes[0].count) {
-        Error("Node num %u out of bounds of pack with %u nodes", num, packnodes[0].count);
+        I_Error("Node num %u out of bounds of pack with %u nodes", num, packnodes[0].count);
     }
     // Return node.
     return &packnodes[num];
@@ -98,13 +98,13 @@ static bool IsBranch(const packnode_t *node) {
 
 static void AssertBranch(const packnode_t *node) {
     if (!IsBranch(node)) {
-        Error("Attempted to use lump node like a branch");
+        I_Error("Attempted to use lump node like a branch");
     }
 }
 
 static void AssertLump(const packnode_t *node) {
     if (IsBranch(node)) {
-        Error("Attempted to use branch node like a lump");
+        I_Error("Attempted to use branch node like a lump");
     }
 }
 
@@ -129,7 +129,7 @@ uint32_t W_CheckNumByName(uint32_t parent, const char *name) {
 uint32_t W_GetNumByName(uint32_t parent, const char *name) {
     uint32_t result = W_CheckNumByName(parent, name);
     if (result == 0) {
-        Error("Pack does not have required node");
+        I_Error("Pack does not have required node");
     }
     return result;
 }
@@ -145,7 +145,7 @@ void *W_ReadLump(uint32_t num, size_t *size) {
     void *result = Allocate(node->size);
     // Read the contents of the file.
     if (I_FileRead(packfile, result, node->size) != node->size) {
-        Error("Failed to read lump node");
+        I_Error("Failed to read lump node");
     }
     // Write the size to the pointer.
     if (size != NULL) {

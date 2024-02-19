@@ -1,12 +1,12 @@
 #include "a_classes.h"
 #include "g_menu.h"
 #include "i_input.h"
+#include "i_system.h"
 #include "i_video.h"
 #include "m_load.h"
 #include "r_actor.h"
 #include "r_draw.h"
 #include "r_main.h"
-#include "u_error.h"
 #include "w_pack.h"
 #include "z_memory.h"
 
@@ -17,7 +17,7 @@ actor_t *fortesting;
 
 void B_MainInit(void) {
     if (!W_Open("assets.bin")) {
-        Error("Failed to open pack");
+        I_Error("Failed to open pack");
     }
 
     // Init modules.

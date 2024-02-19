@@ -18,7 +18,6 @@ SRCFILES := \
 	src/r_sector.c \
 	src/r_wall.c \
 	src/u_aabb.c \
-	src/u_error.c \
 	src/u_file.c \
 	src/u_format.c \
 	src/u_list.c \

@@ -1,5 +1,4 @@
 #include "i_all.h"
-#include "u_error.h"
 #include "u_format.h"
 
 #include "pd_api.h"
@@ -31,14 +30,14 @@ void I_FileClose(file_t *file) {
 
 void I_FileSeek(file_t *file, int32_t amt, int whence) {
     if (playdate->file->seek((SDFile *) file, amt, whence) < 0) {
-        Error("I_FileSeek failed");
+        I_Error("I_FileSeek failed");
     }
 }
 
 uint32_t I_FileTell(file_t *file) {
     int result = playdate->file->tell((SDFile *) file);
     if (result < 0) {
-        Error("I_FileTell failed");
+        I_Error("I_FileTell failed");
     }
     return result;
 }
@@ -116,17 +115,10 @@ void B_MainInit(void);
 void B_MainLoop(void);
 void B_MainQuit(void);
 
-// If true, an error occurred.
-static bool haderror = false;
-
 static int init(lua_State *L) {
     (void) L;
 
-    if (CatchError()) {
-        haderror = true;
-    } else {
-        B_MainInit();
-    }
+    B_MainInit();
 
     return 0;
 }
@@ -134,15 +126,7 @@ static int init(lua_State *L) {
 static int update(lua_State *L) {
     (void) L;
 
-    if (haderror) {
-        return 0;
-    }
-
-    if (CatchError()) {
-        haderror = true;
-    } else {
-        B_MainLoop();
-    }
+    B_MainLoop();
 
     return 0;
 }
@@ -150,11 +134,28 @@ static int update(lua_State *L) {
 static int quit(lua_State *L) {
     (void) L;
 
-    if (!haderror) {
-        B_MainQuit();
-    }
+    B_MainQuit();
 
     return 0;
+}
+
+noreturn void I_Error(const char *fmt, ...) {
+    static char errorbuf[256];
+
+    // Print the error message to a buffer.
+    va_list list;
+    va_start(list, fmt);
+    FormatStringV(errorbuf, sizeof(errorbuf), fmt, list);
+    va_end(list);
+
+    // Use playdate error handler.
+    playdate->system->error("%s", errorbuf);
+
+#ifdef TARGET_SIMULATOR
+    exit(1);
+#else
+    __builtin_unreachable();
+#endif
 }
 
 #ifdef _WINDLL

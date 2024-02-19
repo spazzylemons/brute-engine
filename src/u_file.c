@@ -1,5 +1,5 @@
 #include "i_file.h"
-#include "u_error.h"
+#include "i_system.h"
 #include "u_file.h"
 #include "z_memory.h"
 
@@ -7,7 +7,7 @@ void *U_FileRead(const char *path, size_t *size) {
     // Open the file.
     file_t *file = I_FileOpen(path, OPEN_RD);
     if (file == NULL) {
-        Error("U_FileRead: File '%s' could not be opened", path);
+        I_Error("U_FileRead: File '%s' could not be opened", path);
     }
     // Get the size of the file.
     I_FileSeek(file, 0, SEEK_END);
@@ -15,13 +15,13 @@ void *U_FileRead(const char *path, size_t *size) {
     I_FileSeek(file, 0, SEEK_SET);
     // Check max file size.
     if (sizeval > MAXFILESIZE) {
-        Error("U_FileRead: File '%s' is too large", path);
+        I_Error("U_FileRead: File '%s' is too large", path);
     }
     // Allocate the buffer.
     void *buffer = Allocate(sizeval);
     // Read into the buffer.
     if (I_FileRead(file, buffer, sizeval) != sizeval) {
-        Error("U_FileRead: Failed to read entire file '%s'", path);
+        I_Error("U_FileRead: Failed to read entire file '%s'", path);
     }
     // Close the file.
     I_FileClose(file);

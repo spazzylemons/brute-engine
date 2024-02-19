@@ -1,10 +1,10 @@
+#include "i_system.h"
 #include "i_video.h"
 #include "m_map.h"
 #include "r_actor.h"
 #include "r_draw.h"
 #include "r_local.h"
 #include "r_wall.h"
-#include "u_error.h"
 #include "w_pack.h"
 #include "y_log.h"
 #include "z_memory.h"
@@ -76,7 +76,7 @@ static sprite_t *LoadSpriteFromLump(uint32_t lump) {
     file_sprite_t *fsprite = W_ReadLump(lump, &size);
     if (fsprite->width == 0) {
         // Maybe we could allow this?
-        Error("Empty sprite");
+        I_Error("Empty sprite");
     }
     uint8_t *fposts = (uint8_t *) fsprite + sizeof(file_sprite_t) + sizeof(uint32_t) * fsprite->width;
     // Calculate total size of posts.
@@ -102,10 +102,10 @@ static sprite_t *LoadSpriteFromLump(uint32_t lump) {
 static void LoadAngle(sprite_t *sprite, spriteframe_t *frame, char a, bool flipped) {
     int32_t angle = a - '1';
     if (angle < 0 || angle >= 8) {
-        Error("Angle index out of bounds");
+        I_Error("Angle index out of bounds");
     }
     if (frame->sprites[angle] != NULL) {
-        Error("Duplicate angle");
+        I_Error("Duplicate angle");
     }
     frame->sprites[angle] = sprite;
     if (flipped) {
@@ -161,11 +161,11 @@ void R_LoadSprites(void) {
             // Get frame index.
             int32_t frameindex = framename[0] - 'a';
             if (frameindex < 0 || frameindex >= spritedef->numframes) {
-                Error("Frame index out of bounds");
+                I_Error("Frame index out of bounds");
             }
             spriteframe_t *spriteframe = &spritedef->frames[frameindex];
             if (spriteframe->valid) {
-                Error("Duplicate frame");
+                I_Error("Duplicate frame");
             }
             // Iterate over the frame branch.
             LoadFrame(spriteframe, framebranch);

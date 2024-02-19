@@ -6,6 +6,8 @@
  * optional memory leak tracing.
  */
 
+#include <stdint.h>
+
 // If this is defined, we use a debugging allocator. This allows tracking
 // memory leaks, and a chance to detect invalid frees.
 #define DEBUG_ALLOCATOR

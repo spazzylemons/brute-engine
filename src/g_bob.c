@@ -1,7 +1,7 @@
 #include "g_bob.h"
+#include "i_system.h"
 #include "i_video.h"
 #include "r_draw.h"
-#include "u_error.h"
 #include "w_pack.h"
 #include "z_memory.h"
 
@@ -19,11 +19,11 @@ bob_t *G_LoadBob(uint32_t lumpnum) {
     file_bob_t *fbob = W_ReadLump(lumpnum, &size);
     // Check data.
     if (fbob->width == 0 || fbob->height == 0) {
-        Error("Empty bob");
+        I_Error("Empty bob");
     }
     size_t datasize = (((fbob->width + 7) >> 3) << 1) * fbob->height;
     if (size < datasize + sizeof(file_bob_t)) {
-        Error("Bob missing data");
+        I_Error("Bob missing data");
     }
     // Convert.
     bob_t *bob = Allocate(sizeof(bob_t) + datasize);

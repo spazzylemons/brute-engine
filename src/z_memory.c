@@ -1,5 +1,5 @@
 #include "i_memory.h"
-#include "u_error.h"
+#include "i_system.h"
 #include "u_list.h"
 #include "y_log.h"
 #include "z_memory.h"
@@ -32,7 +32,7 @@ void *Allocate2(size_t size, const char *file, uint32_t line) {
     allocblock_t *block = I_Malloc(size + sizeof(allocblock_t));
     // Check if allocation failed.
     if (block == NULL) {
-        Error("%s:%u: Allocation of size %u failed", file, line, size);
+        I_Error("%s:%u: Allocation of size %u failed", file, line, size);
     }
     // Fill in data.
     U_ListInsert(&allocations, &block->list);
@@ -54,7 +54,7 @@ void Deallocate2(void *ptr, const char *file, uint32_t line) {
     if (block->magic != MAGIC_NUMBER) {
         // Most of the time an invalid free will just crash. But if we can
         // catch some cases, why not?
-        Error("%s:%u: Invalid free", file, line);
+        I_Error("%s:%u: Invalid free", file, line);
     }
     // Free data.
     U_ListRemove(&block->list);
@@ -80,7 +80,7 @@ void *Allocate(size_t size) {
     }
     void *result = I_Malloc(size);
     if (result == NULL) {
-        Error("Allocation of size %u failed.", size);
+        I_Error("Allocation of size %u failed.", size);
     }
     return result;
 }

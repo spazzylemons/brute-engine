@@ -1,5 +1,5 @@
+#include "i_system.h"
 #include "m_load.h"
-#include "u_error.h"
 #include "u_file.h"
 #include "u_format.h"
 #include "u_vec.h"
@@ -92,18 +92,18 @@ static void LoadPatch(patch_t *patch, const char *name) {
     );
     // Verify the allocation at least has the dimensions.
     if (size < 1) {
-        Error("M_Load: Patch missing dimensions");
+        I_Error("M_Load: Patch missing dimensions");
     }
     // Get the dimensions.
     uint16_t width = 1 << (fpatch->dimensions & 15);
     uint16_t height = 1 << (fpatch->dimensions >> 4);
     if (width < 1 || height < 1) {
-        Error("M_Load: Patch too small");
+        I_Error("M_Load: Patch too small");
     }
     // Verify the size is as promised.
     size_t datasize = height * width;
     if (size < 1 + datasize) {
-        Error("M_Load: Patch missing data");
+        I_Error("M_Load: Patch missing data");
     }
     // Allocate patch and copy data over.
     patch->width = width;
@@ -133,7 +133,7 @@ static void LoadFlat(flat_t *flat, const char *name) {
         &size
     );
     if (size < 4096) {
-        Error("M_Load: Flat missing data");
+        I_Error("M_Load: Flat missing data");
     }
     // Copy the data.
     memcpy(&flat->data[0], fflat, sizeof(flat->data));
@@ -173,7 +173,7 @@ static patch_t *GetPatchById(map_t *map, uint8_t id) {
     // Check patch array.
     id -= 1;
     if (id >= map->numpatches) {
-        Error("M_Load: Patch index %d is out of range", id);
+        I_Error("M_Load: Patch index %d is out of range", id);
     }
     return &map->patches[id];
 }
@@ -186,7 +186,7 @@ static flat_t *GetFlatById(map_t *map, uint8_t id) {
     // Check flat array.
     id -= 1;
     if (id >= map->numflats) {
-        Error("M_Load: Flat index %d is out of range", id);
+        I_Error("M_Load: Flat index %d is out of range", id);
     }
     return &map->flats[id];
 }
@@ -201,7 +201,7 @@ static void LoadWalls(uint32_t branch, map_t *map) {
         wall_t *wall = &map->walls[i];
         // Check bounds of wall vertex.
         if (fwall->vertex >= map->numvtxs) {
-            Error("M_Load: Vertices of wall %d are out of bounds", i);
+            I_Error("M_Load: Vertices of wall %d are out of bounds", i);
         }
         // Store vertex 1. Vertex 2 cannot be set until sectors are converted.
         wall->v1 = &map->vtxs[fwall->vertex];
@@ -224,7 +224,7 @@ static void LoadSectors(uint32_t branch, map_t *map) {
     file_sector_t *fscts = ReadMapFile(branch, "sectors", &map->numscts, sizeof(file_sector_t));
     // This error will be obsolete once actors are supported.
     if (map->numscts == 0) {
-        Error("Map has no sectors.");
+        I_Error("Map has no sectors.");
     }
     // Allocate sectors.
     map->scts = Allocate(sizeof(sector_t) * map->numscts);
@@ -234,10 +234,10 @@ static void LoadSectors(uint32_t branch, map_t *map) {
         sector_t *sector = &map->scts[i];
         // Check that the sector is a polygon.
         if (fsector->num_walls < 3) {
-            Error("M_Load: Sector %d is not a polygon", i);
+            I_Error("M_Load: Sector %d is not a polygon", i);
         }
         if (fsector->ceiling <= fsector->floor) {
-            Error("M_Load: Sector %d has non-positive vertical space", i);
+            I_Error("M_Load: Sector %d has non-positive vertical space", i);
         }
         sector->floor = fsector->floor;
         sector->ceiling = fsector->ceiling;
@@ -245,7 +245,7 @@ static void LoadSectors(uint32_t branch, map_t *map) {
         size_t wstart = fsector->first_wall;
         size_t wend = wstart + fsector->num_walls;
         if (wend > map->numwalls) {
-            Error("M_Load: Walls of sector %d are out of bounds", i);
+            I_Error("M_Load: Walls of sector %d are out of bounds", i);
         }
         // Finish converting the walls, and find the bounding box.
         sector->walls = &map->walls[fsector->first_wall];
@@ -260,7 +260,7 @@ static void LoadSectors(uint32_t branch, map_t *map) {
             wall->v2 = next->v1;
             // Wall must have a nonzero length.
             if (U_VecDistSq(wall->v1, wall->v2) == 0.0f) {
-                Error("M_Load: Wall %d of sector %d has zero length", j, i);
+                I_Error("M_Load: Wall %d of sector %d has zero length", j, i);
             }
             // Precalculate delta.
             U_VecCopy(&wall->delta, wall->v2);
@@ -277,7 +277,7 @@ static void LoadSectors(uint32_t branch, map_t *map) {
             size_t portalindex = (uintptr_t) wall->portal;
             if (portalindex != i) {
                 if (portalindex >= map->numscts) {
-                    Error("M_Load: Portal index of wall %d of sector %d is out of bounds", j, i);
+                    I_Error("M_Load: Portal index of wall %d of sector %d is out of bounds", j, i);
                 }
                 wall->portal = &map->scts[portalindex];
             } else {
