@@ -1,4 +1,3 @@
-#include "a_classes.h"
 #include "g_menu.h"
 #include "i_input.h"
 #include "i_system.h"
@@ -13,6 +12,9 @@
 static map_t *map = NULL;
 static actor_t *player = NULL;
 
+// TODO!
+map_t *currentMap;
+
 actor_t *fortesting;
 
 void B_MainInit(void) {
@@ -26,22 +28,26 @@ void B_MainInit(void) {
     R_LoadSprites();
 
     map = M_Load("map01");
+    currentMap = map;
 
     // Spawn the player.
-    vector_t pos;
-    pos.x = 0.0f;
-    pos.y = 0.0f;
-    player = A_ActorSpawn(&A_ClassPlayer, &pos, 0.0f, &map->scts[0]);
+    // vector_t pos;
+    // pos.x = 0.0f;
+    // pos.y = 0.0f;
+    // player = A_ActorSpawn(&A_ClassPlayer, &pos, 0.0f, &map->scts[0]);
 
     // Spawn an empty object in front of the player.
-    pos.y = 64.0f;
-    fortesting = A_ActorSpawn(&A_ClassEmpty, &pos, 0.0f, &map->scts[0]);
+    // pos.y = 64.0f;
+    // fortesting = A_ActorSpawn(&A_ClassEmpty, &pos, 0.0f, &map->scts[0]);
 }
 
 void B_MainLoop(void) {
+    if (player == NULL) {
+        player = ((actor_t *) actorlist.next);
+    }
+
     R_LoadFramebuffer();
     if (!G_IsMenuOpen()) {
-        A_ActorUpdate();
         // If menu button pressed, open menu.
         if (I_GetPressedButtons() & BTN_M) {
             G_MenuReset();

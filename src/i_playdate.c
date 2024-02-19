@@ -1,3 +1,4 @@
+#include "a_actor.h"
 #include "i_all.h"
 #include "u_format.h"
 
@@ -116,26 +117,160 @@ void B_MainLoop(void);
 void B_MainQuit(void);
 
 static int init(lua_State *L) {
-    (void) L;
-
     B_MainInit();
-
     return 0;
 }
 
 static int update(lua_State *L) {
-    (void) L;
-
     B_MainLoop();
-
     return 0;
 }
 
 static int quit(lua_State *L) {
-    (void) L;
-
     B_MainQuit();
+    return 0;
+}
 
+extern map_t *currentMap;
+
+static actor_t *GetActorPointer(void) {
+    actor_t *actor = playdate->lua->getArgObject(1, "bruteclass.actor", NULL);
+    if (actor == NULL) {
+        I_Error("Unregistered actor");
+    }
+    return actor;
+}
+
+static int actor_register(lua_State *L) {
+    vector_t vec;
+    vec.x = playdate->lua->getArgFloat(1);
+    vec.y = playdate->lua->getArgFloat(2);
+
+    actor_t *actor = A_ActorSpawn(&vec, currentMap);
+    playdate->lua->pushObject(actor, "bruteclass.actor", 0);
+
+    return 1;
+}
+
+static int actor_getPos(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    playdate->lua->pushFloat(actor->pos.x);
+    playdate->lua->pushFloat(actor->pos.y);
+    return 2;
+}
+
+static int actor_setPos(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    actor->pos.x = playdate->lua->getArgFloat(2);
+    actor->pos.y = playdate->lua->getArgFloat(3);
+    A_ActorUpdateSector(actor);
+
+    return 0;
+}
+
+static int actor_getVel(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    playdate->lua->pushFloat(actor->vel.x);
+    playdate->lua->pushFloat(actor->vel.y);
+    return 2;
+}
+
+static int actor_setVel(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    actor->vel.x = playdate->lua->getArgFloat(2);
+    actor->vel.y = playdate->lua->getArgFloat(3);
+    return 0;
+}
+
+static int actor_getZPos(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    playdate->lua->pushFloat(actor->zpos);
+    return 1;
+}
+
+static int actor_setZPos(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    actor->zpos = playdate->lua->getArgFloat(2);
+    return 0;
+}
+
+static int actor_getZVel(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    playdate->lua->pushFloat(actor->zvel);
+    return 1;
+}
+
+static int actor_setZVel(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    actor->zvel = playdate->lua->getArgFloat(2);
+    return 0;
+}
+
+static int actor_getAngle(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    playdate->lua->pushFloat(actor->angle);
+    return 1;
+}
+
+static int actor_setAngle(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    actor->angle = playdate->lua->getArgFloat(2);
+    return 0;
+}
+
+static int actor_applyVelocity(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    A_ActorApplyVelocity(actor);
+    return 0;
+}
+
+static int actor_applyGravity(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    A_ActorApplyGravity(actor);
+    return 0;
+}
+
+static void InitLua(void) {
+    // Core functions
+    playdate->lua->addFunction(init, "brute.init", NULL);
+    playdate->lua->addFunction(update, "brute.update", NULL);
+    playdate->lua->addFunction(quit, "brute.quit", NULL);
+
+    // Actor functions
+    playdate->lua->registerClass("bruteclass.actor", NULL, NULL, 0, NULL);
+    playdate->lua->addFunction(actor_register, "brute.actor.register", NULL);
+    playdate->lua->addFunction(actor_getPos, "brute.actor.getPos", NULL);
+    playdate->lua->addFunction(actor_setPos, "brute.actor.setPos", NULL);
+    playdate->lua->addFunction(actor_getVel, "brute.actor.getVel", NULL);
+    playdate->lua->addFunction(actor_setVel, "brute.actor.setVel", NULL);
+    playdate->lua->addFunction(actor_getZPos, "brute.actor.getZPos", NULL);
+    playdate->lua->addFunction(actor_setZPos, "brute.actor.setZPos", NULL);
+    playdate->lua->addFunction(actor_getZVel, "brute.actor.getZVel", NULL);
+    playdate->lua->addFunction(actor_setZVel, "brute.actor.setZVel", NULL);
+    playdate->lua->addFunction(actor_getAngle, "brute.actor.getAngle", NULL);
+    playdate->lua->addFunction(actor_setAngle, "brute.actor.setAngle", NULL);
+    playdate->lua->addFunction(actor_applyVelocity, "brute.actor.applyVelocity", NULL);
+    playdate->lua->addFunction(actor_applyGravity, "brute.actor.applyGravity", NULL);
+}
+
+#ifdef _WINDLL
+__declspec(dllexport)
+#endif
+int eventHandler(PlaydateAPI *pd, PDSystemEvent event, uint32_t arg) {
+    (void) arg;
+
+    switch (event) {
+        case kEventInitLua: {
+            playdate = pd;
+            InitLua();
+            break;
+        }
+
+        default: {
+            break;
+        }
+    }
+    
     return 0;
 }
 
@@ -156,27 +291,4 @@ noreturn void I_Error(const char *fmt, ...) {
 #else
     __builtin_unreachable();
 #endif
-}
-
-#ifdef _WINDLL
-__declspec(dllexport)
-#endif
-int eventHandler(PlaydateAPI *pd, PDSystemEvent event, uint32_t arg) {
-    (void) arg;
-
-    switch (event) {
-        case kEventInitLua: {
-            playdate = pd;
-            playdate->lua->addFunction(init, "brute.init", NULL);
-            playdate->lua->addFunction(update, "brute.update", NULL);
-            playdate->lua->addFunction(quit, "brute.quit", NULL);
-            break;
-        }
-
-        default: {
-            break;
-        }
-    }
-    
-    return 0;
 }

@@ -40,37 +40,15 @@ typedef struct {
     float angle;
     // The sector the actor was last seen in.
     sector_t *sector;
-    // The actor's class.
-    const struct actorclass_s *class;
 } actor_t;
 
 extern list_t actorlist;
-
-// An actor class. Describes how an actor should act.
-typedef struct actorclass_s {
-    // The size of the object to allocate.
-    size_t size;
-
-    // Call to initialize the object.
-    // pos, angle, and sector are already set.
-    // Can be NULL if not applicable.
-    void (*init)(actor_t *this);
-
-    // Call to update the object.
-    // Can be NULL if not applicable.
-    void (*update)(actor_t *this);
-} actorclass_t;
 
 // Delete all actors.
 void A_ActorClear(void);
 
 // Spawn an actor.
-actor_t *A_ActorSpawn(
-    const actorclass_t *class,
-    const vector_t *pos,
-    float angle,
-    sector_t *sector
-);
+actor_t *A_ActorSpawn(const vector_t *pos, const map_t *map);
 
 // Common code for applying horizontal velocity.
 void A_ActorApplyVelocity(actor_t *this);
@@ -80,8 +58,5 @@ void A_ActorApplyGravity(actor_t *this);
 
 // Update the actor's current sector.
 void A_ActorUpdateSector(actor_t *this);
-
-// Update all actors.
-void A_ActorUpdate(void);
 
 #endif

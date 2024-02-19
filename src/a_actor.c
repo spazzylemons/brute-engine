@@ -23,45 +23,24 @@ void A_ActorClear(void) {
     }
 }
 
-actor_t *A_ActorSpawn(
-    const actorclass_t *class,
-    const vector_t *pos,
-    float angle,
-    sector_t *sector
-) {
+actor_t *A_ActorSpawn(const vector_t *pos, const map_t *map) {
     // Allocate actor.
-    actor_t *actor = Allocate(class->size);
+    actor_t *actor = Allocate(sizeof(actor_t));
+    actor->sector = &map->scts[0];
     // Add to linked lists.
     U_ListInsert(&actorlist, &actor->list);
-    U_ListInsert(&sector->actors, &actor->slist);
+    U_ListInsert(&actor->sector->actors, &actor->slist);
     // Fill in fields.
     U_VecCopy(&actor->pos, pos);
+    A_ActorUpdateSector(actor);
     actor->flags = 0;
     actor->vel.x = 0.0f;
     actor->vel.y = 0.0f;
-    actor->angle = angle;
-    actor->zpos = sector->floor;
+    actor->angle = 0.0f;
+    actor->zpos = actor->sector->floor;
     actor->zvel = 0.0f;
-    actor->sector = sector;
-    actor->class = class;
-    // Initialize actor.
-    if (class->init != NULL) {
-        class->init(actor);
-    }
     // Return actor.
     return actor;
-}
-
-void A_ActorUpdate(void) {
-    listiter_t iter;
-    U_ListIterInit(&iter, &actorlist);
-    actor_t *actor;
-
-    while ((actor = (actor_t *) U_ListIterNext(&iter)) != NULL) {
-        if (actor->class->update != NULL) {
-            actor->class->update(actor);
-        }
-    }
 }
 
 void A_ActorApplyVelocity(actor_t *this) {

@@ -1,7 +1,5 @@
 SRCFILES := \
 	src/a_actor.c \
-	src/a_misc.c \
-	src/a_player.c \
 	src/b_main.c \
 	src/g_bob.c \
 	src/g_font.c \
