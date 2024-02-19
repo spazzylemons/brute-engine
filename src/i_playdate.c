@@ -119,8 +119,20 @@ void B_MainQuit(void);
 // If true, an error occurred.
 static bool haderror = false;
 
-static int update(void *userdata) {
-    (void) userdata;
+static int init(lua_State *L) {
+    (void) L;
+
+    if (CatchError()) {
+        haderror = true;
+    } else {
+        B_MainInit();
+    }
+
+    return 0;
+}
+
+static int update(lua_State *L) {
+    (void) L;
 
     if (haderror) {
         return 0;
@@ -132,7 +144,17 @@ static int update(void *userdata) {
         B_MainLoop();
     }
 
-    return 1;
+    return 0;
+}
+
+static int quit(lua_State *L) {
+    (void) L;
+
+    if (!haderror) {
+        B_MainQuit();
+    }
+
+    return 0;
 }
 
 #ifdef _WINDLL
@@ -142,22 +164,11 @@ int eventHandler(PlaydateAPI *pd, PDSystemEvent event, uint32_t arg) {
     (void) arg;
 
     switch (event) {
-        case kEventInit: {
+        case kEventInitLua: {
             playdate = pd;
-            playdate->system->setUpdateCallback(update, NULL);
-
-            if (CatchError()) {
-                haderror = true;
-            } else {
-                B_MainInit();
-            }
-            break;
-        }
-
-        case kEventTerminate: {
-            if (!haderror) {
-                B_MainQuit();
-            }
+            playdate->lua->addFunction(init, "brute.init", NULL);
+            playdate->lua->addFunction(update, "brute.update", NULL);
+            playdate->lua->addFunction(quit, "brute.quit", NULL);
             break;
         }
 

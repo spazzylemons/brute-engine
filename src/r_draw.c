@@ -75,7 +75,7 @@ static inline void PlotPixelLow(uint8_t *framebuffer, uint8_t shade, uint8_t mas
     uint8_t value = *framebuffer;
     if ((value ^ shade) & mask) {
         value &= ~mask;
-        value |= (shade & mask);
+        value |= shade & mask;
         *framebuffer = value;
     }
 }

@@ -1,33 +1,55 @@
-# This Makefile delegates to other Makefiles depending on the target.
+include Makefile.common
 
-.PHONY: all emscripten playdate sdl clean assetextract
+HEAP_SIZE      = 8388208
+STACK_SIZE     = 61800
 
-# Attempt to get the processor count for multithreaded compilation.
-PROC_COUNT := $(shell nproc)
-ifeq ($(PROC_COUNT),)
-# looks like we don't have nproc...
-PROC_COUNT := 1
+PRODUCT = Brute.pdx
+
+# Locate the SDK
+SDK = ${PLAYDATE_SDK_PATH}
+ifeq ($(SDK),)
+	SDK = $(shell egrep '^\s*SDKRoot' ~/.Playdate/config | head -n 1 | cut -c9-)
 endif
 
-# The first recipe is the default. here we make it fail so you are required to
-# specify a target.
-all:
-	$(error "Please specify a target: 'make emscripten', 'make playdate', or 'make sdl'")
+ifeq ($(SDK),)
+$(error SDK path not found; set ENV value PLAYDATE_SDK_PATH)
+endif
 
-emscripten: assetextract
-	$(MAKE) -f Makefile.emscripten -j$(PROC_COUNT)
+######
+# IMPORTANT: You must add your source folders to VPATH for make to find them
+# ex: VPATH += src1:src2
+######
 
-playdate: assetextract
-	$(MAKE) -f Makefile.playdate -j$(PROC_COUNT)
+VPATH += src
 
-sdl: assetextract
-	$(MAKE) -f Makefile.sdl -j$(PROC_COUNT)
+# List C source files here
+SRC = $(SRCFILES) src/i_playdate.c
 
-clean:
-	$(MAKE) -f Makefile.emscripten clean
-	$(MAKE) -f Makefile.playdate clean
-	$(MAKE) -f Makefile.sdl clean
-	-rm -rf Source/assets.bin
+# List all user directories here
+UINCDIR = 
 
-assetextract:
-	tools/map_converter.py assets/ Source/assets.bin
+# List user asm files
+UASRC = 
+
+# List all user C define here, like -D_DEBUG=1
+UDEFS = 
+
+# Define ASM defines here
+UADEFS = 
+
+# List the user directory to look for the libraries here
+ULIBDIR =
+
+# List all user libraries here
+ULIBS =
+
+include $(SDK)/C_API/buildsupport/common.mk
+
+src/g_menu.c: src/g_menugen.inl
+
+src/g_menugen.inl:
+	tools/menu_generator.py
+
+# More aggressive optimizations.
+OPT += -flto=auto -O3 -Wextra
+LDFLAGS += -flto=auto

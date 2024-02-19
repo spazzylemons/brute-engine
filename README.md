@@ -1,6 +1,6 @@
 # Brute
 
-First-person 3D game for Playdate, PC, and web.
+First-person 3D game for Playdate.
 
 ## Code structure
 
