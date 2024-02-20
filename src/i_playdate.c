@@ -3,6 +3,7 @@
 #include "r_draw.h"
 #include "r_main.h"
 #include "u_format.h"
+#include "z_memory.h"
 
 // Note on pause menu: The manu button is an undocumented seventh button. Therefore
 // we don't have to do anything to implement
@@ -176,6 +177,18 @@ static int actor_applyGravity(lua_State *L) {
     return 0;
 }
 
+static int actor_despawn(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    A_ActorDespawn(actor);
+    return 0;
+}
+
+static int actor_free(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    Deallocate(actor);
+    return 0;
+}
+
 static int render_draw(lua_State *L) {
     actor_t *actor = GetActorPointer();
     R_LoadFramebuffer();
@@ -208,6 +221,8 @@ static lua_reg actor_regs[] = {
     { "setAngle", actor_setAngle },
     { "applyVelocity", actor_applyVelocity },
     { "applyGravity", actor_applyGravity },
+    { "despawn", actor_despawn },
+    { "free", actor_free },
     { NULL, NULL },
 };
 

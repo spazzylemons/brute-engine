@@ -20,6 +20,13 @@ function brute.classes.actor.__index(table, key)
     return oldActorIndex[key]
 end
 
+brute.classes.actor.__gc = oldActorIndex.free
+
+local oldDespawn = oldActorIndex.despawn
+function oldActorIndex:despawn()
+    self.scheduleDespawn = true
+end
+
 function brute.classes.actor.__newindex(table, key, value)
     local data = actorData[table]
     data[key] = value
@@ -50,4 +57,18 @@ function actor.update()
             obj:update()
         end
     end
+
+    -- handle despawns
+    local newActorList = {}
+    for i = 1, #actorList do
+        local obj = actorList[i]
+        if obj.scheduleDespawn then
+            -- remove object
+            actorData[obj] = nil
+            oldDespawn(obj)
+        else
+            newActorList[#newActorList+1] = obj
+        end
+    end
+    actorList = newActorList
 end

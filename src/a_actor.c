@@ -9,27 +9,12 @@
 
 #define CLIMB_SPEED 6.0f
 
-// The list of actors.
-EMPTY_LIST(actorlist);
-
-void A_ActorClear(void) {
-    listiter_t iter;
-    U_ListIterInit(&iter, &actorlist);
-    actor_t *actor;
-
-    while ((actor = (actor_t *) U_ListIterNext(&iter)) != NULL) {
-        U_ListRemove(&actor->list);
-        Deallocate(actor);
-    }
-}
-
 actor_t *A_ActorSpawn(const vector_t *pos, const map_t *map) {
     // Allocate actor.
     actor_t *actor = Allocate(sizeof(actor_t));
     actor->sector = &map->scts[0];
-    // Add to linked lists.
-    U_ListInsert(&actorlist, &actor->list);
-    U_ListInsert(&actor->sector->actors, &actor->slist);
+    // Add to linked list.
+    U_ListInsert(&actor->sector->actors, &actor->sectorlist);
     // Fill in fields.
     U_VecCopy(&actor->pos, pos);
     A_ActorUpdateSector(actor);
@@ -41,6 +26,10 @@ actor_t *A_ActorSpawn(const vector_t *pos, const map_t *map) {
     actor->zvel = 0.0f;
     // Return actor.
     return actor;
+}
+
+void A_ActorDespawn(actor_t *this) {
+    U_ListRemove(&this->sectorlist);
 }
 
 void A_ActorApplyVelocity(actor_t *this) {
@@ -109,9 +98,9 @@ void A_ActorUpdateSector(actor_t *this) {
     // if the sector didn't change.
     if (sector != NULL && sector != this->sector) {
         // Unlink from previous sector.
-        U_ListRemove(&this->slist);
+        U_ListRemove(&this->sectorlist);
         // Link to new sector.
-        U_ListInsert(&sector->actors, &this->slist);
+        U_ListInsert(&sector->actors, &this->sectorlist);
         // Update sector field.
         this->sector = sector;
     }

@@ -22,10 +22,8 @@ typedef enum {
 // An actor. This is the base of all actor objects, which can derive from this
 // struct by including it as their first member.
 typedef struct {
-    // Node in list of actors.
-    list_t list;
     // Node in list of actors per sector.
-    list_t slist;
+    list_t sectorlist;
     // Various flags.
     actorflags_t flags;
     // The actor's position.
@@ -42,13 +40,11 @@ typedef struct {
     sector_t *sector;
 } actor_t;
 
-extern list_t actorlist;
-
-// Delete all actors.
-void A_ActorClear(void);
-
 // Spawn an actor.
 actor_t *A_ActorSpawn(const vector_t *pos, const map_t *map);
+
+// Destroy an actor.
+void A_ActorDespawn(actor_t *this);
 
 // Common code for applying horizontal velocity.
 void A_ActorApplyVelocity(actor_t *this);

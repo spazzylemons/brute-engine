@@ -14,6 +14,8 @@ local DEG_225 = -DEG_135
 local DEG_270 = -DEG_90
 local DEG_315 = -DEG_45
 
+local dummies = {}
+
 local function getAnalogStrength()
     local angle = playdate.getCrankPosition()
     if angle <= 180 then
@@ -93,7 +95,14 @@ function Player:update()
 
     if playdate.buttonJustPressed(playdate.kButtonA) then
         local x, y = self:getPos()
-        actor.spawn({}, x, y, self:getAngle())
+        dummies[#dummies+1] = actor.spawn({}, x, y, self:getAngle())
+    end
+
+    if playdate.buttonJustPressed(playdate.kButtonB) then
+        for i = 1, #dummies do
+            dummies[i]:despawn()
+        end
+        dummies = {}
     end
 
     local vx, vy = self:getVel()
@@ -116,5 +125,6 @@ function playdate.update()
 end
 
 function playdate.gameWillTerminate()
+    collectgarbage()
     brute.quit()
 end

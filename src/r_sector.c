@@ -96,13 +96,10 @@ void R_DrawSector(sector_t *sector, uint16_t left, uint16_t right) {
         // Add all actors in this sector to actor drawing queue.
         listiter_t iter;
         U_ListIterInit(&iter, &rendersector->actors);
-        void *ptr;
+        actor_t *actor;
 
         // For each actor...
-        while ((ptr = U_ListIterNext(&iter))) {
-            // This is what happens when you use too many linked lists.
-            const actor_t *actor = (void *) ((char *) ptr
-                - __builtin_offsetof(actor_t, slist));
+        while ((actor = (actor_t *) U_ListIterNext(&iter))) {
             R_AddActor(actor);
         }
     } while (depth != 0);

@@ -30,7 +30,6 @@ void B_MainInit(void) {
 
 void B_MainQuit(void) {
     // Clean up modules.
-    A_ActorClear();
     G_MenuDeinit();
     M_Free(map);
     R_FreeSprites();
