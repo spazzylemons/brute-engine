@@ -7,9 +7,10 @@
 #include "r_main.h"
 #include "r_sector.h"
 #include "r_wall.h"
-#include "u_math.h"
 
 #include <math.h>
+
+#define TAU  6.2831853f
 
 // Calculate view bobbing.
 static float ViewBobbing(const actor_t *actor) {

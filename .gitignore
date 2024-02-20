@@ -6,9 +6,7 @@ __pycache__
 /brute
 /*.pdx
 /Source/pdex.*
-/Source/maps
-/Source/flats
-/Source/patches
 /Source/assets.bin
+/Source/assets
 /web/brute.*
 /src/g_menugen.inl

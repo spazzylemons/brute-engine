@@ -10,44 +10,6 @@
 
 PlaydateAPI *playdate;
 
-file_t *I_FileOpen(const char *path, openmode_t mode) {
-    FileOptions opts;
-    switch (mode) {
-        case OPEN_RD:
-            opts = kFileRead | kFileReadData;
-            break;
-        case OPEN_WR:
-            opts = kFileWrite;
-            break;
-        default:
-            return NULL;
-    }
-
-    return (file_t *) playdate->file->open(path, opts);
-}
-
-void I_FileClose(file_t *file) {
-    playdate->file->close((SDFile *) file);
-}
-
-void I_FileSeek(file_t *file, int32_t amt, int whence) {
-    if (playdate->file->seek((SDFile *) file, amt, whence) < 0) {
-        I_Error("I_FileSeek failed");
-    }
-}
-
-uint32_t I_FileTell(file_t *file) {
-    int result = playdate->file->tell((SDFile *) file);
-    if (result < 0) {
-        I_Error("I_FileTell failed");
-    }
-    return result;
-}
-
-uint32_t I_FileRead(file_t *file, void *buffer, uint32_t size) {
-    return playdate->file->read((SDFile *) file, buffer, size);
-}
-
 buttonmask_t I_GetHeldButtons(void) {
     PDButtons buttons;
     playdate->system->getButtonState(&buttons, NULL, NULL);

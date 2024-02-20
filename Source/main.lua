@@ -37,7 +37,7 @@ function Player:init()
 end
 
 function Player:moveCrank()
-    self:setAngle(angleAddself:getAngle() + getAnalogStrength() * TURNSPEED)
+    self:setAngle(self:getAngle() + getAnalogStrength() * TURNSPEED)
 
     local angle = nil
     if playdate.buttonIsPressed(playdate.kButtonLeft) then

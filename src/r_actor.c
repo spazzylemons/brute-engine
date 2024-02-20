@@ -5,7 +5,7 @@
 #include "r_draw.h"
 #include "r_local.h"
 #include "r_wall.h"
-#include "w_pack.h"
+#include "u_file.h"
 #include "z_memory.h"
 
 #include <math.h>
@@ -76,11 +76,14 @@ typedef struct {
 // Array of sprite definitions.
 static spritedef_t spritedefs[NUMSPRITES];
 
-static sprite_t *LoadSpriteFromLump(uint32_t lump) {
+static sprite_t *LoadSpriteFromFile(const char *name) {
     // Load sprite file data.
     // TODO we're missing some validation here.
+    char *path;
+    playdate->system->formatString(&path, "assets/sprites/%s", name);
     size_t size;
-    file_sprite_t *fsprite = W_ReadLump(lump, &size);
+    file_sprite_t *fsprite = U_FileRead(path, &size);
+    playdate->system->realloc(path, 0);
     if (fsprite->width == 0) {
         // Maybe we could allow this?
         I_Error("Empty sprite");
@@ -122,61 +125,49 @@ static void LoadAngle(sprite_t *sprite, spriteframe_t *frame, char a, bool flipp
     }
 }
 
-static void LoadFrame(spriteframe_t *frame, uint32_t branch) {
-    // Iterate over the frame branch.
-    uint32_t lump;
-    branchiter_t iter;
-    W_IterInit(&iter, branch);
-    char name[8];
-    while ((lump = W_IterNext(&iter, name))) {
-        // TODO load sprite from lump.
-        sprite_t *sprite = LoadSpriteFromLump(lump);
-        // Get angles.
-        if (name[0] == '0') {
-            // Load all angles with one sprite.
-            frame->unique = 1;
-            for (uint8_t i = 0; i < 8; i++) {
-                frame->sprites[i] = sprite;
-            }
-        } else {
-            LoadAngle(sprite, frame, name[0], false);
-            if (name[1]) {
-                LoadAngle(sprite, frame, name[1], true);
-            }
+static void LoadFrameCallback(const char *name, void *userdata) {
+    if (strlen(name) < 6)
+        return;
+
+    spriteframe_t *frame = NULL;
+    for (int i = 0; i < NUMSPRITES; i++) {
+        if (!strncmp(name, spritenames[i], 4)) {
+            frame = spritedefs[i].frames;
+            break;
+        }
+    }
+
+    if (frame == NULL)
+        return;
+
+    sprite_t *sprite = LoadSpriteFromFile(name);
+    // Get angles.
+    if (name[5] == '0') {
+        // Load all angles with one sprite.
+        frame->unique = 1;
+        for (uint8_t i = 0; i < 8; i++) {
+            frame->sprites[i] = sprite;
+        }
+    } else {
+        LoadAngle(sprite, frame, name[4], false);
+        if (name[5]) {
+            LoadAngle(sprite, frame, name[5], true);
         }
     }
 }
 
 void R_LoadSprites(void) {
-    // Get sprites branch.
-    uint32_t spritebranch = W_GetNumByName(ROOTID, "sprites");
     // Iterate through sprite IDs.
     for (spritetype_t i = 0; i < NUMSPRITES; i++) {
         // Get spritedef pointer.
         spritedef_t *spritedef = &spritedefs[i];
-        // Iterate over the frames.
-        branchiter_t iter;
-        W_IterInit(&iter, W_GetNumByName(spritebranch, spritenames[i]));
         // Allocate frames.
-        spritedef->numframes = iter.remaining;
+        // TODO determine number of frames!
+        spritedef->numframes = 1;
         spritedef->frames = Allocate(sizeof(spriteframe_t) * spritedef->numframes);
         memset(spritedef->frames, 0, sizeof(spriteframe_t) * spritedef->numframes);
         // For each frame...
-        uint32_t framebranch;
-        char framename[8];
-        while ((framebranch = W_IterNext(&iter, framename))) {
-            // Get frame index.
-            int32_t frameindex = framename[0] - 'a';
-            if (frameindex < 0 || frameindex >= spritedef->numframes) {
-                I_Error("Frame index out of bounds");
-            }
-            spriteframe_t *spriteframe = &spritedef->frames[frameindex];
-            if (spriteframe->valid) {
-                I_Error("Duplicate frame");
-            }
-            // Iterate over the frame branch.
-            LoadFrame(spriteframe, framebranch);
-        }
+        playdate->file->listfiles("assets/sprites", LoadFrameCallback, NULL, 0);
     }
 }
 

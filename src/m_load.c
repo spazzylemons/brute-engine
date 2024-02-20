@@ -1,9 +1,7 @@
 #include "i_system.h"
 #include "m_load.h"
 #include "u_file.h"
-#include "u_format.h"
 #include "u_vec.h"
-#include "w_pack.h"
 #include "z_memory.h"
 
 #include <math.h>
@@ -64,19 +62,14 @@ typedef struct PACKED {
     uint8_t texbot;
 } file_wall_t;
 
-static uint32_t branchflats;   // Branch containing flats.
-static uint32_t branchmaps;    // Branch containing maps.
-static uint32_t branchpatches; // Branch containing patches.
+static const char *mapname;
 
-void M_Init(void) {
-    branchflats = W_GetNumByName(ROOTID, "flats");
-    branchmaps = W_GetNumByName(ROOTID, "maps");
-    branchpatches = W_GetNumByName(ROOTID, "patches");
-}
-
-static void *ReadMapFile(uint32_t branch, const char *file, size_t *szp, size_t mbsz) {
+static void *ReadMapFile(const char *file, size_t *szp, size_t mbsz) {
     // Read file.
-    void *result = W_ReadLump(W_GetNumByName(branch, file), szp);
+    char *path;
+    playdate->system->formatString(&path, "assets/maps/%s/%s", mapname, file);
+    void *result = U_FileRead(path, szp);
+    playdate->system->realloc(path, 0);
     // Divide size by member count.
     *szp /= mbsz;
     // Return file contents.
@@ -85,11 +78,11 @@ static void *ReadMapFile(uint32_t branch, const char *file, size_t *szp, size_t 
 
 // Load a patch from a bitmap.
 static void LoadPatch(patch_t *patch, const char *name) {
+    char *path;
+    playdate->system->formatString(&path, "assets/patches/%.8s", name);
     size_t size;
-    file_patch_t *fpatch = W_ReadLump(
-        W_GetNumByName(branchpatches, name),
-        &size
-    );
+    file_patch_t *fpatch = U_FileRead(path, &size);
+    playdate->system->realloc(path, 0);
     // Verify the allocation at least has the dimensions.
     if (size < 1) {
         I_Error("M_Load: Patch missing dimensions");
@@ -114,8 +107,8 @@ static void LoadPatch(patch_t *patch, const char *name) {
     Deallocate(fpatch);
 }
 
-static void LoadPatches(uint32_t branch, map_t *map) {
-    char *fpatches = ReadMapFile(branch, "patches", &map->numpatches, sizeof(char[8]));
+static void LoadPatches(map_t *map) {
+    char *fpatches = ReadMapFile("patches", &map->numpatches, sizeof(char[8]));
     // Each 8 bytes is a patch name.
     map->patches = Allocate(sizeof(patch_t) * map->numpatches);
     for (size_t i = 0; i < map->numpatches; i++) {
@@ -127,11 +120,11 @@ static void LoadPatches(uint32_t branch, map_t *map) {
 
 // Load a flat from a bitmap.
 static void LoadFlat(flat_t *flat, const char *name) {
+    char *path;
+    playdate->system->formatString(&path, "assets/flats/%.8s", name);
     size_t size;
-    uint8_t *fflat = W_ReadLump(
-        W_GetNumByName(branchflats, name),
-        &size
-    );
+    uint8_t *fflat = U_FileRead(path, &size);
+    playdate->system->realloc(path, 0);
     if (size < 4096) {
         I_Error("M_Load: Flat missing data");
     }
@@ -141,8 +134,8 @@ static void LoadFlat(flat_t *flat, const char *name) {
     Deallocate(fflat);
 }
 
-static void LoadFlats(uint32_t branch, map_t *map) {
-    char *fflats = ReadMapFile(branch, "flats", &map->numflats, sizeof(char[8]));
+static void LoadFlats(map_t *map) {
+    char *fflats = ReadMapFile("flats", &map->numflats, sizeof(char[8]));
     // Each 8 bytes is a patch name.
     map->flats = Allocate(sizeof(flat_t) * map->numflats);
     for (size_t i = 0; i < map->numflats; i++) {
@@ -152,8 +145,8 @@ static void LoadFlats(uint32_t branch, map_t *map) {
     Deallocate(fflats);
 }
 
-static void LoadVertices(uint32_t branch, map_t *map) {
-    file_vertex_t *fvtxs = ReadMapFile(branch, "vertices", &map->numvtxs, sizeof(file_vertex_t));
+static void LoadVertices(map_t *map) {
+    file_vertex_t *fvtxs = ReadMapFile("vertices", &map->numvtxs, sizeof(file_vertex_t));
     // Allocate vertices.
     map->vtxs = Allocate(sizeof(vector_t) * map->numvtxs);
     // Convert vertices.
@@ -191,8 +184,8 @@ static flat_t *GetFlatById(map_t *map, uint8_t id) {
     return &map->flats[id];
 }
 
-static void LoadWalls(uint32_t branch, map_t *map) {
-    file_wall_t *fwalls = ReadMapFile(branch, "walls", &map->numwalls, sizeof(file_wall_t));
+static void LoadWalls(map_t *map) {
+    file_wall_t *fwalls = ReadMapFile("walls", &map->numwalls, sizeof(file_wall_t));
     // Allocate walls.
     map->walls = Allocate(sizeof(wall_t) * map->numwalls);
     // Convert walls. Not all data is validated until sectors are converted.
@@ -220,8 +213,8 @@ static void LoadWalls(uint32_t branch, map_t *map) {
     Deallocate(fwalls);
 }
 
-static void LoadSectors(uint32_t branch, map_t *map) {
-    file_sector_t *fscts = ReadMapFile(branch, "sectors", &map->numscts, sizeof(file_sector_t));
+static void LoadSectors(map_t *map) {
+    file_sector_t *fscts = ReadMapFile("sectors", &map->numscts, sizeof(file_sector_t));
     // This error will be obsolete once actors are supported.
     if (map->numscts == 0) {
         I_Error("Map has no sectors.");
@@ -300,15 +293,14 @@ static void LoadSectors(uint32_t branch, map_t *map) {
 map_t *M_Load(const char *name) {
     // Allocate map.
     map_t *map = Allocate(sizeof(map_t));
-    // Open branch containing map lumps.
-    uint32_t branch = W_GetNumByName(W_GetNumByName(ROOTID, "maps"), name);
+    mapname = name;
     // Load the textures.
-    LoadPatches(branch, map);
-    LoadFlats(branch, map);
+    LoadPatches(map);
+    LoadFlats(map);
     // Load each part of the map.
-    LoadVertices(branch, map);
-    LoadWalls(branch, map);
-    LoadSectors(branch, map);
+    LoadVertices(map);
+    LoadWalls(map);
+    LoadSectors(map);
     return map;
 }
 

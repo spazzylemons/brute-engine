@@ -3,9 +3,6 @@
 
 #include "m_defs.h"
 
-// Load important branch nodes from the pack.
-void M_Init(void);
-
 // Loads a map from /maps/$name.
 map_t *M_Load(const char *name);
 

@@ -9,3 +9,6 @@ uint16_t sectorxmax;
 const sector_t *rendersector;
 vector_t renderpos;
 fixed_t rendereyeheight;
+
+// TODO
+uint8_t detaillevel = 1;
