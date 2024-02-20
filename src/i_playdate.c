@@ -1,13 +1,13 @@
 #include "a_actor.h"
 #include "i_all.h"
+#include "r_draw.h"
+#include "r_main.h"
 #include "u_format.h"
-
-#include "pd_api.h"
 
 // Note on pause menu: The manu button is an undocumented seventh button. Therefore
 // we don't have to do anything to implement
 
-static PlaydateAPI *playdate;
+PlaydateAPI *playdate;
 
 file_t *I_FileOpen(const char *path, openmode_t mode) {
     FileOptions opts;
@@ -59,39 +59,6 @@ buttonmask_t I_GetPressedButtons(void) {
     return (buttonmask_t) buttons;
 }
 
-// Deadzone in degrees.
-#define DEADZONE 10.0f
-
-float I_GetAnalogStrength(void) {
-    float crankangle = playdate->system->getCrankAngle();
-    if (crankangle <= 180.0f) {
-        // Deadzone of ten degrees either way.
-        float anglechange;
-        if (crankangle < 90.0f - DEADZONE) {
-            anglechange = (90.0f - DEADZONE) - crankangle;
-        } else if (crankangle > 90.0f + DEADZONE) {
-            anglechange = (90.0f + DEADZONE) - crankangle;
-        } else {
-            anglechange = 0.0f;
-        }
-        return anglechange;
-    } else {
-        return 0.0f;
-    }
-}
-
-bool I_HasAnalogInput(void) {
-    return !playdate->system->isCrankDocked();
-}
-
-void *I_Malloc(size_t size) {
-    return playdate->system->realloc(NULL, size);
-}
-
-void I_Free(void *ptr) {
-    playdate->system->realloc(ptr, 0);
-}
-
 void I_Log(const char *string) {
     playdate->system->logToConsole("%s", string);
 }
@@ -108,21 +75,11 @@ void I_MarkFramebufferDirty(void) {
     playdate->graphics->markUpdatedRows(0, LCD_ROWS - 1);
 }
 
-void I_DrawFPS(void) {
-    playdate->system->drawFPS(0, 0);
-}
-
 void B_MainInit(void);
-void B_MainLoop(void);
 void B_MainQuit(void);
 
 static int init(lua_State *L) {
     B_MainInit();
-    return 0;
-}
-
-static int update(lua_State *L) {
-    B_MainLoop();
     return 0;
 }
 
@@ -134,22 +91,11 @@ static int quit(lua_State *L) {
 extern map_t *currentMap;
 
 static actor_t *GetActorPointer(void) {
-    actor_t *actor = playdate->lua->getArgObject(1, "bruteclass.actor", NULL);
+    actor_t *actor = playdate->lua->getArgObject(1, "brute.classes.actor", NULL);
     if (actor == NULL) {
         I_Error("Unregistered actor");
     }
     return actor;
-}
-
-static int actor_register(lua_State *L) {
-    vector_t vec;
-    vec.x = playdate->lua->getArgFloat(1);
-    vec.y = playdate->lua->getArgFloat(2);
-
-    actor_t *actor = A_ActorSpawn(&vec, currentMap);
-    playdate->lua->pushObject(actor, "bruteclass.actor", 0);
-
-    return 1;
 }
 
 static int actor_getPos(lua_State *L) {
@@ -230,27 +176,51 @@ static int actor_applyGravity(lua_State *L) {
     return 0;
 }
 
+static int render_draw(lua_State *L) {
+    actor_t *actor = GetActorPointer();
+    R_LoadFramebuffer();
+    R_RenderViewpoint(actor);
+    R_FlushFramebuffer();
+    return 0;
+}
+
+static int newActor(lua_State *L) {
+    vector_t vec;
+    vec.x = playdate->lua->getArgFloat(1);
+    vec.y = playdate->lua->getArgFloat(2);
+
+    actor_t *actor = A_ActorSpawn(&vec, currentMap);
+    playdate->lua->pushObject(actor, "brute.classes.actor", 0);
+
+    return 1;
+}
+
+static lua_reg actor_regs[] = {
+    { "getPos", actor_getPos },
+    { "setPos", actor_setPos },
+    { "getVel", actor_getVel },
+    { "setVel", actor_setVel },
+    { "getZPos", actor_getZPos },
+    { "setZPos", actor_setZPos },
+    { "getZVel", actor_getZVel },
+    { "setZVel", actor_setZVel },
+    { "getAngle", actor_getAngle },
+    { "setAngle", actor_setAngle },
+    { "applyVelocity", actor_applyVelocity },
+    { "applyGravity", actor_applyGravity },
+    { NULL, NULL },
+};
+
 static void InitLua(void) {
     // Core functions
     playdate->lua->addFunction(init, "brute.init", NULL);
-    playdate->lua->addFunction(update, "brute.update", NULL);
     playdate->lua->addFunction(quit, "brute.quit", NULL);
 
     // Actor functions
-    playdate->lua->registerClass("bruteclass.actor", NULL, NULL, 0, NULL);
-    playdate->lua->addFunction(actor_register, "brute.actor.register", NULL);
-    playdate->lua->addFunction(actor_getPos, "brute.actor.getPos", NULL);
-    playdate->lua->addFunction(actor_setPos, "brute.actor.setPos", NULL);
-    playdate->lua->addFunction(actor_getVel, "brute.actor.getVel", NULL);
-    playdate->lua->addFunction(actor_setVel, "brute.actor.setVel", NULL);
-    playdate->lua->addFunction(actor_getZPos, "brute.actor.getZPos", NULL);
-    playdate->lua->addFunction(actor_setZPos, "brute.actor.setZPos", NULL);
-    playdate->lua->addFunction(actor_getZVel, "brute.actor.getZVel", NULL);
-    playdate->lua->addFunction(actor_setZVel, "brute.actor.setZVel", NULL);
-    playdate->lua->addFunction(actor_getAngle, "brute.actor.getAngle", NULL);
-    playdate->lua->addFunction(actor_setAngle, "brute.actor.setAngle", NULL);
-    playdate->lua->addFunction(actor_applyVelocity, "brute.actor.applyVelocity", NULL);
-    playdate->lua->addFunction(actor_applyGravity, "brute.actor.applyGravity", NULL);
+    playdate->lua->registerClass("brute.classes.actor", actor_regs, NULL, 0, NULL);
+    playdate->lua->addFunction(newActor, "brute.newActor", NULL);
+
+    playdate->lua->addFunction(render_draw, "brute.render.draw", NULL);
 }
 
 #ifdef _WINDLL

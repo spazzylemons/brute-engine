@@ -5,7 +5,10 @@
  * System interface functions.
  */
 
+#include <pd_api.h>
 #include <stdnoreturn.h>
+
+extern PlaydateAPI *playdate;
 
 // Log a string to the console, followed by a line feed.
 void I_Log(const char *string);

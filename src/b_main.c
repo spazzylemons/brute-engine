@@ -10,12 +10,9 @@
 #include "z_memory.h"
 
 static map_t *map = NULL;
-static actor_t *player = NULL;
 
 // TODO!
 map_t *currentMap;
-
-actor_t *fortesting;
 
 void B_MainInit(void) {
     if (!W_Open("assets.bin")) {
@@ -29,38 +26,6 @@ void B_MainInit(void) {
 
     map = M_Load("map01");
     currentMap = map;
-
-    // Spawn the player.
-    // vector_t pos;
-    // pos.x = 0.0f;
-    // pos.y = 0.0f;
-    // player = A_ActorSpawn(&A_ClassPlayer, &pos, 0.0f, &map->scts[0]);
-
-    // Spawn an empty object in front of the player.
-    // pos.y = 64.0f;
-    // fortesting = A_ActorSpawn(&A_ClassEmpty, &pos, 0.0f, &map->scts[0]);
-}
-
-void B_MainLoop(void) {
-    if (player == NULL) {
-        player = ((actor_t *) actorlist.next);
-    }
-
-    R_LoadFramebuffer();
-    if (!G_IsMenuOpen()) {
-        // If menu button pressed, open menu.
-        if (I_GetPressedButtons() & BTN_M) {
-            G_MenuReset();
-        }
-    }
-    // Draw player viewpoint.
-    R_RenderViewpoint(player);
-    if (G_IsMenuOpen()) {
-        G_MenuShow();
-    }
-    R_FlushFramebuffer();
-
-    I_DrawFPS();
 }
 
 void B_MainQuit(void) {

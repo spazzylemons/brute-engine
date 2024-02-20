@@ -19,6 +19,9 @@
 // Allocate memory. Size can be 0.
 #define Allocate(_size_) Allocate2(_size_, __FILE__, __LINE__)
 
+// Reallocate memory.
+#define Reallocate(_ptr_, _size_) Reallocate2(_ptr_, _size_, __FILE__, __LINE__)
+
 // Free memory. Freeing NULL does nothing.
 #define Deallocate(_ptr_) Deallocate2(_ptr_, __FILE__, __LINE__)
 
@@ -28,12 +31,18 @@ void CheckLeaks(void);
 // Debug allocate function.
 void *Allocate2(size_t size, const char *file, uint32_t line);
 
+// Debug reallocate function.
+void *Reallocate2(void *ptr, size_t size, const char *file, uint32_t line);
+
 // Debug deallocate function.
 void Deallocate2(void *ptr, const char *file, uint32_t line);
 
 #else
 // Allocate memory. Size can be 0.
 void *Allocate(size_t size);
+
+// Reallocate memory.
+void *Reallocate(void *ptr, size_t size);
 
 // Free memory. Freeing NULL does nothing.
 void Deallocate(void *ptr);

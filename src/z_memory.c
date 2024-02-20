@@ -1,4 +1,3 @@
-#include "i_memory.h"
 #include "i_system.h"
 #include "u_list.h"
 #include "y_log.h"
@@ -29,7 +28,7 @@ static EMPTY_LIST(allocations);
 
 void *Allocate2(size_t size, const char *file, uint32_t line) {
     // Allocate block of memory.
-    allocblock_t *block = I_Malloc(size + sizeof(allocblock_t));
+    allocblock_t *block = playdate->system->realloc(NULL, size + sizeof(allocblock_t));
     // Check if allocation failed.
     if (block == NULL) {
         I_Error("%s:%u: Allocation of size %u failed", file, line, size);
@@ -40,6 +39,35 @@ void *Allocate2(size_t size, const char *file, uint32_t line) {
     block->line = line;
     block->file = file;
     block->size = size;
+    // Return a pointer to the data.
+    return block->data;
+}
+
+void *Reallocate2(void *ptr, size_t size, const char *file, uint32_t line) {
+    // If NULL, use regular allocate.
+    if (ptr == NULL) {
+        return Allocate2(size, file, line);
+    }
+    // Convert to block pointer.
+    allocblock_t *block = (allocblock_t *) (((char *) ptr) - __builtin_offsetof(allocblock_t, data));
+    if (block->magic != MAGIC_NUMBER) {
+        // Most of the time an invalid realloc will just crash. But if we can
+        // catch some cases, why not?
+        I_Error("%s:%u: Invalid realloc", file, line);
+    }
+    // Remove from list.
+    U_ListRemove(&block->list);
+    // Perform reallocation.
+    block = playdate->system->realloc(block, size + sizeof(allocblock_t));
+    if (block == NULL) {
+        I_Error("%s:%u: Reallocation of size %u failed", file, line, size);
+    }
+    // Update information.
+    block->line = line;
+    block->file = file;
+    block->size = size;
+    // Add back into list.
+    U_ListInsert(&allocations, &block->list);
     // Return a pointer to the data.
     return block->data;
 }
@@ -58,7 +86,7 @@ void Deallocate2(void *ptr, const char *file, uint32_t line) {
     }
     // Free data.
     U_ListRemove(&block->list);
-    I_Free(block);
+    playdate->system->realloc(block, 0);
 }
 
 void CheckLeaks(void) {
@@ -78,9 +106,17 @@ void *Allocate(size_t size) {
         // Don't make empty allocations.
         size = 1;
     }
-    void *result = I_Malloc(size);
+    void *result = playdate->system->realloc(NULL, size);
     if (result == NULL) {
         I_Error("Allocation of size %u failed.", size);
+    }
+    return result;
+}
+
+void *Reallocate(void *ptr, size_t size) {
+    void *result = playdate->system->realloc(ptr, size);
+    if (result == NULL) {
+        I_Error("Reallocation of size %u failed.", size);
     }
     return result;
 }
@@ -88,7 +124,7 @@ void *Allocate(size_t size) {
 void Deallocate(void *ptr) {
     // Don't free NULL.
     if (ptr != NULL) {
-        I_Free(ptr);
+        playdate->system->realloc(ptr, 0);
     }
 }
 

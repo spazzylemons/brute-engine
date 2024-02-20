@@ -16,7 +16,4 @@ uint8_t *__attribute__((aligned(4))) I_GetFramebuffer(void);
 // Mark framebuffer as updated to invalidate caches.
 void I_MarkFramebufferDirty(void);
 
-// Draw the FPS in the top-left corner.
-void I_DrawFPS(void);
-
 #endif

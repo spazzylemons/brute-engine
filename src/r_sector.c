@@ -29,6 +29,7 @@ void R_DrawSector(sector_t *sector, uint16_t left, uint16_t right) {
 
     numclipbytes = 0;
 
+    R_ClearActors();
     R_ClearViswalls();
 
     // Initialize stack.
@@ -89,6 +90,22 @@ void R_DrawSector(sector_t *sector, uint16_t left, uint16_t right) {
         }
         // Draw the floor and ceiling.
         // Note for later: It's bugged. Oops!
+        // Note from later: How? Looks fine to me!
         R_DrawWallFlats();
+
+        // Add all actors in this sector to actor drawing queue.
+        listiter_t iter;
+        U_ListIterInit(&iter, &rendersector->actors);
+        void *ptr;
+
+        // For each actor...
+        while ((ptr = U_ListIterNext(&iter))) {
+            // This is what happens when you use too many linked lists.
+            const actor_t *actor = (void *) ((char *) ptr
+                - __builtin_offsetof(actor_t, slist));
+            R_AddActor(actor);
+        }
     } while (depth != 0);
+
+    R_DrawActors();
 }

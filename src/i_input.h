@@ -24,10 +24,4 @@ buttonmask_t I_GetHeldButtons(void);
 // Get buttons pressed.
 buttonmask_t I_GetPressedButtons(void);
 
-// Get strength of analog input. Value has no real units or limits.
-float I_GetAnalogStrength(void);
-
-// Return true if analog input can be used.
-bool I_HasAnalogInput(void);
-
 #endif

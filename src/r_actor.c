@@ -6,7 +6,6 @@
 #include "r_local.h"
 #include "r_wall.h"
 #include "w_pack.h"
-#include "y_log.h"
 #include "z_memory.h"
 
 #include <math.h>
@@ -27,6 +26,14 @@ static viswall_t viswalls[MAXVISWALLS];
 static const char *const spritenames[NUMSPRITES] = {
     [SPR_TEST] = "test",
 };
+
+typedef struct {
+    const actor_t *actor;
+    int32_t px, py;
+} visactor_t;
+
+static visactor_t *actor_array = NULL;
+static size_t num_actors = 0;
 
 #define PACKED __attribute__((__packed__))
 
@@ -234,22 +241,10 @@ static uint8_t ClipY(int32_t y, uint16_t x) {
     }
 }
 
-static void DrawActor(const actor_t *actor) {
-    // Bail if set to not render.
-    if (actor->flags & ACTOR_NORENDER) {
-        return;
-    }
-    // Translate position locally.
-    vector_t pos;
-    U_VecCopy(&pos, &actor->pos);
-    U_VecSub(&pos, &renderpos);
-    R_RotatePoint(&pos);
-    int32_t px = floorf(pos.x);
-    int32_t py = floorf(pos.y);
-    // Don't draw if too close.
-    if (py <= 0) {
-        return;
-    }
+static void DrawActor(const visactor_t *visactor) {
+    const actor_t *actor = visactor->actor;
+    int32_t px = visactor->px;
+    int32_t py = visactor->py;
     // Get sprite.
     sprite_t *sprite = spritedefs[SPR_TEST].frames[0].sprites[0];
     fixed_t scale = (SCRNDISTI << FRACBITS) / py;
@@ -334,13 +329,47 @@ static void DrawActor(const actor_t *actor) {
     }
 }
 
-void R_DrawActors(void) {
-    listiter_t iter;
-    U_ListIterInit(&iter, &actorlist);
-    actor_t *actor;
+void R_ClearActors(void) {
+    Deallocate(actor_array);
+    actor_array = NULL;
+    num_actors = 0;
+}
 
-    // For each actor...
-    while ((actor = (actor_t *) U_ListIterNext(&iter))) {
-        DrawActor(actor);
+void R_AddActor(const actor_t *actor) {
+    // Bail if set to not render.
+    if (actor->flags & ACTOR_NORENDER) {
+        return;
     }
+    // Translate position locally.
+    vector_t pos;
+    U_VecCopy(&pos, &actor->pos);
+    U_VecSub(&pos, &renderpos);
+    R_RotatePoint(&pos);
+    int32_t px = floorf(pos.x);
+    int32_t py = floorf(pos.y);
+    // Don't draw if too close.
+    if (py <= 0) {
+        return;
+    }
+
+    actor_array = Reallocate(actor_array, sizeof(visactor_t) * (num_actors + 1));
+
+    visactor_t *entry = &actor_array[num_actors++];
+    entry->actor = actor;
+    entry->px = px;
+    entry->py = py;
+}
+
+static int SortActors(const void *p, const void *q) {
+    const visactor_t *ap = p;
+    const visactor_t *aq = q;
+    return aq->py - ap->py;
+}
+
+void R_DrawActors(void) {
+    qsort(actor_array, num_actors, sizeof(visactor_t), SortActors);
+    for (size_t i = 0; i < num_actors; i++) {
+        DrawActor(&actor_array[i]);
+    }
+    R_ClearActors();
 }

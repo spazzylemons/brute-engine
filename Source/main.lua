@@ -1,6 +1,5 @@
 import "actor.lua"
 
----@class Player: Actor
 local Player = {}
 
 local DEADZONE = 10
@@ -92,6 +91,11 @@ function Player:update()
         dx, dy = self:moveCrank()
     end
 
+    if playdate.buttonJustPressed(playdate.kButtonA) then
+        local x, y = self:getPos()
+        actor.spawn({}, x, y, self:getAngle())
+    end
+
     local vx, vy = self:getVel()
     vx = (vx + dx * 0.25) * 0.8
     vy = (vy + dy * 0.25) * 0.8
@@ -103,11 +107,12 @@ end
 
 brute.init()
 
-actor.spawn(Player, 0, 0, 0)
+local player = actor.spawn(Player, 0, 0, 0)
 
 function playdate.update()
     actor.update()
-    brute.update()
+    brute.render.draw(player)
+    playdate.drawFPS(0, 0)
 end
 
 function playdate.gameWillTerminate()

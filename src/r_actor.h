@@ -29,6 +29,10 @@ void R_ClearViswalls(void);
 // Get a pointer to a viswall to write to, or NULL if out of space.
 viswall_t *R_NewViswall(void);
 
+void R_ClearActors(void);
+
+void R_AddActor(const actor_t *actor);
+
 // Draw actors.
 void R_DrawActors(void);
 
