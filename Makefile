@@ -23,10 +23,14 @@ endif
 VPATH += src
 
 # List C source files here
-SRC = $(SRCFILES) src/i_playdate.c
+SRC = $(wildcard src/*.c) \
+	$(wildcard src/actor/*.c) \
+	$(wildcard src/map/*.c) \
+	$(wildcard src/render/*.c) \
+	$(wildcard src/util/*.c)
 
 # List all user directories here
-UINCDIR = 
+UINCDIR = src/
 
 # List user asm files
 UASRC = 

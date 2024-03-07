@@ -1,5 +1,7 @@
 import "actor.lua"
 
+brute.classes.map.__gc = brute.classes.map.__index.free
+
 local Player = {}
 
 local DEADZONE = 10
@@ -15,6 +17,8 @@ local DEG_270 = -DEG_90
 local DEG_315 = -DEG_45
 
 local dummies = {}
+
+local map = brute.map.load("map01")
 
 local function getAnalogStrength()
     local angle = playdate.getCrankPosition()
@@ -95,7 +99,7 @@ function Player:update()
 
     if playdate.buttonJustPressed(playdate.kButtonA) then
         local x, y = self:getPos()
-        dummies[#dummies+1] = actor.spawn({}, x, y, self:getAngle())
+        dummies[#dummies+1] = actor.spawn(self.map, {}, x, y, self:getAngle())
     end
 
     if playdate.buttonJustPressed(playdate.kButtonB) then
@@ -116,7 +120,7 @@ end
 
 brute.init()
 
-local player = actor.spawn(Player, 0, 0, 0)
+local player = actor.spawn(map, Player, 0, 0, 0)
 
 function playdate.update()
     actor.update()

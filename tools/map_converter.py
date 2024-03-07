@@ -12,8 +12,6 @@ import shutil
 import struct
 import sys
 
-from pack import Branch, Lump
-
 from PIL import Image
 
 UNQUOTE = re.compile(r'\\(.)')

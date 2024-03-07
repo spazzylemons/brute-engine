@@ -34,11 +34,12 @@ end
 
 actor = {}
 
-function actor.spawn(class, x, y, angle)
-    local obj = brute.newActor(x, y)
+function actor.spawn(map, class, x, y, angle)
+    local obj = map:spawn(x, y)
     actorData[obj] = {}
 
     obj:setAngle(angle)
+    obj.map = map
     obj.class = class
 
     if obj.init ~= nil then
